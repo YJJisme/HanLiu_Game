@@ -47,7 +47,12 @@
         <button id="rankAll" class="button" type="button">綜合排行榜</button>
       </div>
       <div id="leaderboardContent" class="leaderboard-content"></div>
-      <button id="rankClear" class="button" type="button">清除排行榜</button>
+      <div class="actions" style="margin-top:0.75rem">
+        <button id="rankExport" class="button" type="button">匯出排行榜</button>
+        <button id="rankImport" class="button" type="button">匯入排行榜</button>
+        <button id="rankClear" class="button" type="button">清除排行榜</button>
+        <input id="rankFile" type="file" accept="application/json" hidden>
+      </div>
       <button id="modalClose" class="modal-close" type="button" aria-label="關閉">×</button>
     </div>
   </div>

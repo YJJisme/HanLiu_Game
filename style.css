@@ -337,7 +337,29 @@ body {
 .idea-ok:hover { border-color: #a4d3e2; }
 
  
-.modal-title { margin: 0 0 1rem; font-size: 1.5rem; letter-spacing: 0.12em; color: var(--title); text-align: center; }
+.modal-title { margin: 0 0 1rem; font-size: 1.7rem; letter-spacing: 0.12em; color: var(--title); text-align: center; font-weight: 900; text-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+.modal .dialog-text { color: #f1f5f9; font-size: 1.15rem; font-weight: 900; letter-spacing: 0.04em; text-shadow: 0 1px 0 rgba(0,0,0,0.35); }
+
+/* 分數浮動提示 */
+.score-float {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+  color: #7bd389;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  animation: scoreFloatUp 800ms ease-out 1;
+  pointer-events: none;
+}
+.score-float.neg { color: #e84e4e; }
+@keyframes scoreFloatUp {
+  0% { opacity: 0; transform: translate(-50%, 8px); }
+  15% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 0.9; transform: translate(-50%, -16px); }
+  100% { opacity: 0; transform: translate(-50%, -28px); }
+}
  
 #levelPoetry { padding-right: 160px; padding-bottom: 160px; }
 .maze-grid {
@@ -468,3 +490,35 @@ body {
         padding: 8px 12px;
     }
 }
+/* 第一關：句讀明義互動版 */
+.seg-box {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  background: #fff8e6;
+  border: 3px solid #b87333;
+}
+.seg-char {
+  font-size: clamp(20px, 3vw, 28px);
+  color: #0b1f3a;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.12);
+}
+.seg-gap {
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 6px;
+  border: 2px dashed #e0b36a;
+  background: #fff3c4;
+  color: #0b1f3a;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.seg-gap.active {
+  border-style: solid;
+  background: #f8e78e;
+}
+.dialog-container .seg-char { color: #0b1f3a !important; }
+.hint-text { color: #4a5b6b; }

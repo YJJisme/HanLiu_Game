@@ -12,6 +12,8 @@ const debugLevelInput = document.getElementById('debugLevelInput');
 const debugStartBtn = document.getElementById('debugStartBtn');
 const DEV_PASSWORD = '3637';
 let devModeEnabled = false;
+const CLOUD_SYNC_ENDPOINT = '';
+const CLOUD_SYNC_AUTH = '';
 const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
@@ -85,6 +87,17 @@ function trackedSetInterval(fn, ms) { const id = setInterval(fn, ms); timerRegis
 function trackedSetTimeout(fn, ms) { const id = setTimeout(fn, ms); timerRegistry.timeouts.add(id); return id; }
 function clearAllTimers() { timerRegistry.intervals.forEach((id) => clearInterval(id)); timerRegistry.timeouts.forEach((id) => clearTimeout(id)); timerRegistry.intervals.clear(); timerRegistry.timeouts.clear(); }
 function systemCleanup(lockGame) { clearAllTimers(); if (lockGame === true) isGameOver = true; }
+function bumpScore(amount) {
+  matchScore += amount;
+  const bar = document.getElementById('hpBar');
+  if (!bar) return;
+  const tip = document.createElement('div');
+  tip.className = 'score-float';
+  if (amount < 0) tip.classList.add('neg');
+  tip.textContent = `${amount > 0 ? '+' : ''}${amount}`;
+  bar.appendChild(tip);
+  tip.addEventListener('animationend', () => { tip.remove(); });
+}
 
 function getLevelType(item) {
   if (typeof item === 'number') return 'Number';
@@ -220,6 +233,7 @@ function handleError(levelType) {
 
 function goToNextLevel() {
   systemCleanup(false);
+  clearMainContent(true);
   currentLevelIndex += 1;
   const item = gameFlow[currentLevelIndex];
   if (item === undefined) { finalizeGame(); return; }
@@ -623,7 +637,7 @@ function startBuddhaBoneLevel() {
       }
       if (pleaPoint >= 4 && rageValue < 100 && courtOpinionValue >= 80) {
         locked = true;
-        showBlockModal('通關', [{ text: '進入潮州貶謫' }], () => { level.style.display = 'none'; goToNextLevel(); });
+        showBlockModal('通關', [{ text: '進入潮州貶謫' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
       }
     }
     const a = document.createElement('button'); a.className = 'button option'; a.type = 'button'; a.textContent = '終極勸諫'; a.addEventListener('click', () => applyAction('A'));
@@ -819,7 +833,7 @@ function startCrocodileLevel() {
           currentIndex += 1;
           hintShown = false;
           lastProgressAt = performance.now();
-          if (currentIndex >= chars.length) { stopGame(); showBlockModal('通關', [{ text: '鱷魚被驅逐，江岸重歸寧靜。' }], () => { level.style.display = 'none'; goToNextLevel(); }); return; }
+          if (currentIndex >= chars.length) { stopGame(); showBlockModal('通關', [{ text: '鱷魚被驅逐，江岸重歸寧靜。' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); }); return; }
         } else { onFail(); return; }
       } else { snake.pop(); }
     }
@@ -942,7 +956,7 @@ function startEpitaphLevel() {
       showBlockModal('通關', [
         { text: '墓誌銘完成，字跡剛勁有力，韓愈表情釋然。' },
         { text: '「文成！ 你明白了文以載道的真義，在公義與私情之間劃下了最完美的句點。你的道統，無人可撼動。」' },
-      ], () => { level.style.display = 'none'; goToNextLevel(); });
+      ], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
     } else {
       locked = true;
       input.disabled = true;
@@ -961,7 +975,7 @@ function startEpitaphLevel() {
       showBlockModal('通關', [
         { text: '墓誌銘完成，字跡剛勁有力，韓愈表情釋然。' },
         { text: '「文成！ 你明白了文以載道的真義，在公義與私情之間劃下了最完美的句點。你的道統，無人可撼動。」' },
-      ], () => { level.style.display = 'none'; goToNextLevel(); });
+      ], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
     } else {
       locked = true;
       input.disabled = true;
@@ -1057,7 +1071,7 @@ function startFiveOriginalsLevel() {
             mismatchCounter = 0;
             state.lock = false;
             if (state.matched === 5) {
-              showBlockModal('通關', [{ text: '文成！你將重回京城，準備大展經綸！' }], () => { level.style.display = 'none'; goToNextLevel(); });
+              showBlockModal('通關', [{ text: '文成！你將重回京城，準備大展經綸！' }], () => { matchScore += 10; level.style.display = 'none'; goToNextLevel(); });
             }
           }, 200);
         } else {
@@ -1176,7 +1190,7 @@ function startPoetryLevel() {
       btn.addEventListener('click', () => {
         const ok = t === q1Poem.title;
         if (ok) {
-          matchScore += 10;
+          bumpScore(10);
           renderQ2();
         } else {
           handleError('Number');
@@ -1200,7 +1214,7 @@ function startPoetryLevel() {
     const displayLines = q2Poem.lines.map((ln, i) => (i === missingIndex ? '______' : ln));
     const content = document.createElement('p');
     content.className = 'dialog-text';
-    content.textContent = displayLines.join('，');
+    content.innerHTML = displayLines.join('<br>');
     level.appendChild(content);
     const options = document.createElement('div');
     options.className = 'options';
@@ -1215,8 +1229,8 @@ function startPoetryLevel() {
       btn.addEventListener('click', () => {
         const ok = line === q2Poem.lines[missingIndex];
         if (ok) {
-          matchScore += 10;
-          showBlockModal('通關', [{ text: '文成！韓愈與孟郊月下推敲，將一起開創盛唐之後的另一番氣象。' }], () => { level.style.display = 'none'; goToNextLevel(); });
+          bumpScore(10);
+          showBlockModal('通關', [{ text: '文成！韓愈與孟郊月下推敲，將一起開創盛唐之後的另一番氣象。' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
         } else {
           handleError('Number');
           if (errorCount === 1) {
@@ -1322,7 +1336,7 @@ function startHuaiXiLevel() {
             running = false;
             showBlockModal('提示', [{ text: '目標已捕獲！' }], () => {
               trackedSetTimeout(() => {
-                showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { level.style.display = 'none'; goToNextLevel(); });
+                showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { matchScore += 10; level.style.display = 'none'; goToNextLevel(); });
               }, 700);
             });
           } else if (it.kind === 'slow') {
@@ -1481,7 +1495,6 @@ function startDreamLevel() {
   // 0.1% 稀有跳過
   const rare = Math.floor(Math.random() * 1000) + 1;
   if (rare === 1) {
-    matchScore += 10;
     goToNextLevel();
     return;
   }
@@ -1532,7 +1545,7 @@ function startDreamLevel() {
     btn.addEventListener('click', () => {
       const ok = i === qs.correct;
       if (ok) {
-        matchScore += 10;
+        matchScore += 5;
         showBlockModal('提示', [{ text: '夢中頓悟，獲得分數！' }], () => { sec.remove(); goToNextLevel(); });
       } else {
         const ex = qs.explain || '解析：請再思考本文主旨與關鍵語句。';
@@ -1618,7 +1631,7 @@ function startReviewLevel() {
     const actual = Array.from(list.children).map(el => el.firstChild.nodeValue.trim());
     const ok = actual.length === expected.length && actual.every((x, i) => x === expected[i]);
     if (ok) {
-      matchScore += 10;
+      matchScore += 20;
       const elapsedSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : Number.MAX_SAFE_INTEGER;
       const fastRoute = elapsedSec <= 600;
       if (fastRoute) {
@@ -1716,7 +1729,7 @@ function startRevivalLevel() {
       btn.className = 'button option';
       btn.type = 'button';
       btn.textContent = opt;
-      btn.addEventListener('click', () => { if (i === item.correct) matchScore += 10; renderOne(); });
+      btn.addEventListener('click', () => { if (i === item.correct) matchScore += 5; renderOne(); });
       options.appendChild(btn);
     });
   }
@@ -1890,7 +1903,7 @@ function startLevel10() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
     document.getElementById('win-screen').classList.remove('hidden');
-    document.getElementById('win-btn').onclick = goToNextLevel;
+    document.getElementById('win-btn').onclick = () => { matchScore += 10; goToNextLevel(); };
   }
   
   function startGame() {
@@ -2029,11 +2042,40 @@ function saveScore(name, score, route) {
   try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
   const now = Date.now();
   const totalSeconds = startTime ? Math.max(0, Math.floor((now - startTime) / 1000)) : 0;
-  arr.push({ name, score, route, time: totalSeconds, progress: currentProgress });
+  const rec = { name, score, route, time: totalSeconds, progress: currentProgress };
+  arr.push(rec);
   localStorage.setItem(key, JSON.stringify(arr));
+  if (CLOUD_SYNC_ENDPOINT) {
+    try {
+      fetch(CLOUD_SYNC_ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(CLOUD_SYNC_AUTH ? { authorization: CLOUD_SYNC_AUTH } : {}) },
+        body: JSON.stringify(rec),
+      }).catch(() => {});
+    } catch {}
+  }
 }
 
-function displayLeaderboard(filterRoute) {
+function displayLeaderboard(filterRoute, skipRemote) {
+  if (!skipRemote && CLOUD_SYNC_ENDPOINT) {
+    try {
+      fetch(CLOUD_SYNC_ENDPOINT, { headers: { ...(CLOUD_SYNC_AUTH ? { authorization: CLOUD_SYNC_AUTH } : {}) } })
+        .then(r => r.json())
+        .then((remote) => {
+          if (Array.isArray(remote)) {
+            const key = 'hanliu_scores';
+            const raw = localStorage.getItem(key);
+            let arr = [];
+            try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
+            const merged = arr.concat(remote);
+            localStorage.setItem(key, JSON.stringify(merged));
+          }
+          displayLeaderboard(filterRoute, true);
+        })
+        .catch(() => {});
+    } catch {}
+    return;
+  }
   const key = 'hanliu_scores';
   const raw = localStorage.getItem(key);
   let arr = [];
@@ -2093,6 +2135,36 @@ function clearLeaderboard() {
     localStorage.removeItem('hanliu_scores');
     displayLeaderboard(leaderboardFilter);
   });
+}
+function exportLeaderboard() {
+  const raw = localStorage.getItem('hanliu_scores') || '[]';
+  const blob = new Blob([raw], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'hanliu_leaderboard.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importLeaderboard(ev) {
+  const file = ev && ev.target && ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const incoming = JSON.parse(String(reader.result || '[]'));
+      const key = 'hanliu_scores';
+      const raw = localStorage.getItem(key);
+      let arr = [];
+      try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
+      const merged = Array.isArray(incoming) ? arr.concat(incoming) : arr;
+      localStorage.setItem(key, JSON.stringify(merged));
+      displayLeaderboard(leaderboardFilter);
+    } catch {}
+  };
+  reader.readAsText(file);
 }
 
 function saveName() {
@@ -2307,11 +2379,28 @@ function renderSentenceQuestion() {
   title.textContent = '第一關：句讀明義';
   const prompt = document.createElement('p');
   prompt.className = 'dialog-text';
-  prompt.textContent = `題目：${q.question}`;
-  const inputBox = document.createElement('input');
-  inputBox.type = 'text';
-  inputBox.className = 'input';
-  inputBox.placeholder = '請在適當處輸入 / 進行斷句（例如：子曰/學而時習之/...）';
+  prompt.textContent = '操作指南：請點擊文字之間的空隙以插入斷句符號（/）。再次點擊可移除。';
+  const segBox = document.createElement('div');
+  segBox.className = 'seg-box';
+  const chars = Array.from(q.question);
+  for (let i = 0; i < chars.length; i++) {
+    const sc = document.createElement('span');
+    sc.className = 'seg-char';
+    sc.textContent = chars[i];
+    segBox.appendChild(sc);
+    if (i < chars.length - 1) {
+      const gap = document.createElement('button');
+      gap.className = 'seg-gap';
+      gap.type = 'button';
+      gap.dataset.index = String(i);
+      gap.textContent = '';
+      gap.addEventListener('click', () => {
+        gap.classList.toggle('active');
+        gap.textContent = gap.classList.contains('active') ? '/' : '';
+      });
+      segBox.appendChild(gap);
+    }
+  }
   const submitBtn = document.createElement('button');
   submitBtn.className = 'button';
   submitBtn.type = 'button';
@@ -2320,17 +2409,23 @@ function renderSentenceQuestion() {
   msg.className = 'dialog-text';
 
   submitBtn.addEventListener('click', () => {
-    const user = normalizeSegmentation(inputBox.value);
+    let built = '';
+    for (let i = 0; i < chars.length; i++) {
+      built += chars[i];
+      const gapEl = segBox.querySelector(`.seg-gap[data-index="${i}"]`);
+      if (gapEl && gapEl.classList.contains('active')) built += '/';
+    }
+    const user = normalizeSegmentation(built);
     const correct = normalizeSegmentation(q.correctSegmentation);
     if (user && user === correct) {
-      matchScore += 10;
       msg.className = 'dialog-text success-text';
-      msg.textContent = '答對！+10 分';
+      msg.textContent = '答對！';
       currentQuestionIndex += 1;
       if (currentQuestionIndex >= currentQuestions.length) {
         const pause = document.createElement('p');
         pause.className = 'dialog-text success-text';
-        pause.textContent = '句讀精準！第二關即將開始...';
+        matchScore += 10;
+        pause.textContent = '句讀精準！+10 分，第二關即將開始...';
         level.appendChild(pause);
         setTimeout(() => { level.style.display = 'none'; goToNextLevel(); }, 1500);
       } else {
@@ -2341,7 +2436,6 @@ function renderSentenceQuestion() {
       if (errorCount === 1) {
         msg.className = 'dialog-text error-text';
         msg.textContent = '身體與靈魂不匹配的警告。韓愈，你辜負了兄嫂的日夜期盼... 請再想想天上的父母，他們的期望，你還能承擔幾次失誤？';
-        inputBox.value = '';
         currentQuestionIndex = Math.min(currentQuestionIndex + 1, currentQuestions.length - 1);
         setTimeout(renderSentenceQuestion, 2000);
       }
@@ -2350,7 +2444,7 @@ function renderSentenceQuestion() {
 
   level.appendChild(title);
   level.appendChild(prompt);
-  level.appendChild(inputBox);
+  level.appendChild(segBox);
   level.appendChild(submitBtn);
   level.appendChild(msg);
 }
@@ -2966,6 +3060,12 @@ rankHan.addEventListener('click', () => { displayLeaderboard('HanYu'); });
 rankLiu.addEventListener('click', () => { displayLeaderboard('LiuZongyuan'); });
 rankAll.addEventListener('click', () => { displayLeaderboard('All'); });
 document.getElementById('rankClear').addEventListener('click', clearLeaderboard);
+const rankExportBtn = document.getElementById('rankExport');
+const rankImportBtn = document.getElementById('rankImport');
+const rankFileInput = document.getElementById('rankFile');
+if (rankExportBtn) rankExportBtn.addEventListener('click', exportLeaderboard);
+if (rankImportBtn) rankImportBtn.addEventListener('click', () => { if (rankFileInput) rankFileInput.click(); });
+if (rankFileInput) rankFileInput.addEventListener('change', importLeaderboard);
 aboutBtn.addEventListener('click', openAbout);
 if (debugStartBtn) debugStartBtn.addEventListener('click', () => {
   if (!devModeEnabled) {
