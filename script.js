@@ -90,13 +90,18 @@ function systemCleanup(lockGame) { clearAllTimers(); if (lockGame === true) isGa
 function bumpScore(amount) {
   matchScore += amount;
   const bar = document.getElementById('hpBar');
-  if (!bar) return;
+  if (!bar || amount === 0) return;
   const tip = document.createElement('div');
   tip.className = 'score-float';
   if (amount < 0) tip.classList.add('neg');
   tip.textContent = `${amount > 0 ? '+' : ''}${amount}`;
   bar.appendChild(tip);
   tip.addEventListener('animationend', () => { tip.remove(); });
+  const st = document.getElementById('scoreText');
+  if (st) {
+    st.classList.add('score-bump');
+    st.addEventListener('animationend', () => { st.classList.remove('score-bump'); }, { once: true });
+  }
 }
 
 function getLevelType(item) {
@@ -1060,7 +1065,7 @@ function startFiveOriginalsLevel() {
         const b = state.open[1];
         const ok = a.dataset.key === b.dataset.key && a.dataset.type !== b.dataset.type;
         if (ok) {
-          matchScore += 10;
+          bumpScore(10);
           setTimeout(() => {
             a.classList.add('matched');
             b.classList.add('matched');
@@ -1071,7 +1076,7 @@ function startFiveOriginalsLevel() {
             mismatchCounter = 0;
             state.lock = false;
             if (state.matched === 5) {
-              showBlockModal('通關', [{ text: '文成！你將重回京城，準備大展經綸！' }], () => { matchScore += 10; level.style.display = 'none'; goToNextLevel(); });
+              showBlockModal('通關', [{ text: '文成！你將重回京城，準備大展經綸！' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
             }
           }, 200);
         } else {
@@ -1336,7 +1341,7 @@ function startHuaiXiLevel() {
             running = false;
             showBlockModal('提示', [{ text: '目標已捕獲！' }], () => {
               trackedSetTimeout(() => {
-                showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { matchScore += 10; level.style.display = 'none'; goToNextLevel(); });
+                showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
               }, 700);
             });
           } else if (it.kind === 'slow') {
@@ -1545,8 +1550,37 @@ function startDreamLevel() {
     btn.addEventListener('click', () => {
       const ok = i === qs.correct;
       if (ok) {
-        matchScore += 5;
-        showBlockModal('提示', [{ text: '夢中頓悟，獲得分數！' }], () => { sec.remove(); goToNextLevel(); });
+        const msg = document.createElement('p');
+        msg.className = 'dialog-text';
+        msg.textContent = '選擇獎勵：';
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        const healBtn = document.createElement('button');
+        healBtn.className = 'button';
+        healBtn.type = 'button';
+        healBtn.textContent = '回血';
+        const scoreBtn = document.createElement('button');
+        scoreBtn.className = 'button';
+        scoreBtn.type = 'button';
+        scoreBtn.textContent = '+5分';
+        const finalize = (fn) => { healBtn.disabled = true; scoreBtn.disabled = true; fn(); };
+        healBtn.addEventListener('click', () => {
+          finalize(() => {
+            errorCount = Math.max(0, errorCount - 1);
+            updateHpBar();
+            showBlockModal('提示', [{ text: '已回血' }], () => { sec.remove(); goToNextLevel(); });
+          });
+        });
+        scoreBtn.addEventListener('click', () => {
+          finalize(() => {
+            bumpScore(5);
+            showBlockModal('提示', [{ text: '獲得 +5 分' }], () => { sec.remove(); goToNextLevel(); });
+          });
+        });
+        actions.appendChild(healBtn);
+        actions.appendChild(scoreBtn);
+        sec.appendChild(msg);
+        sec.appendChild(actions);
       } else {
         const ex = qs.explain || '解析：請再思考本文主旨與關鍵語句。';
         showBlockModal('解析', [{ text: ex }, { text: '單純夢醒，進入下一關。' }], () => { sec.remove(); goToNextLevel(); });
@@ -1631,7 +1665,7 @@ function startReviewLevel() {
     const actual = Array.from(list.children).map(el => el.firstChild.nodeValue.trim());
     const ok = actual.length === expected.length && actual.every((x, i) => x === expected[i]);
     if (ok) {
-      matchScore += 20;
+      bumpScore(20);
       const elapsedSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : Number.MAX_SAFE_INTEGER;
       const fastRoute = elapsedSec <= 600;
       if (fastRoute) {
@@ -1640,13 +1674,14 @@ function startReviewLevel() {
         showBlockModal('通關', [{ text: '你完整回顧了旅程，秩序井然。' }], () => { sec.style.display = 'none'; finalizeGame(); });
       }
     } else {
-      matchScore = 0;
+      const prev = matchScore;
+      if (prev > 0) bumpScore(-prev);
       const elapsedSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : Number.MAX_SAFE_INTEGER;
       const fastRoute = elapsedSec <= 600;
       if (fastRoute) {
-        showBlockModal('白活了', [{ text: '順序錯誤，所有分數歸零。但你在十分鐘內抵達，進入迴光返照關。' }], () => { sec.style.display = 'none'; startRevivalLevel(); });
+        showBlockModal('白活了', [{ text: `順序錯誤，所有分數歸零（-${prev} 分）。但你在十分鐘內抵達，進入迴光返照關。` }], () => { sec.style.display = 'none'; startRevivalLevel(); });
       } else {
-        showBlockModal('白活了', [{ text: '順序錯誤，所有分數歸零。' }], () => { sec.style.display = 'none'; finalizeGame(); });
+        showBlockModal('白活了', [{ text: `順序錯誤，所有分數歸零（-${prev} 分）。` }], () => { sec.style.display = 'none'; finalizeGame(); });
       }
     }
   });
@@ -1729,7 +1764,7 @@ function startRevivalLevel() {
       btn.className = 'button option';
       btn.type = 'button';
       btn.textContent = opt;
-      btn.addEventListener('click', () => { if (i === item.correct) matchScore += 5; renderOne(); });
+      btn.addEventListener('click', () => { if (i === item.correct) bumpScore(5); renderOne(); });
       options.appendChild(btn);
     });
   }
@@ -1903,7 +1938,7 @@ function startLevel10() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
     document.getElementById('win-screen').classList.remove('hidden');
-    document.getElementById('win-btn').onclick = () => { matchScore += 10; goToNextLevel(); };
+    document.getElementById('win-btn').onclick = () => { bumpScore(10); goToNextLevel(); };
   }
   
   function startGame() {
@@ -2045,11 +2080,11 @@ function saveScore(name, score, route) {
   const rec = { name, score, route, time: totalSeconds, progress: currentProgress };
   arr.push(rec);
   localStorage.setItem(key, JSON.stringify(arr));
-  if (CLOUD_SYNC_ENDPOINT) {
+  if (getCloudEndpoint()) {
     try {
-      fetch(CLOUD_SYNC_ENDPOINT, {
+      fetch(getCloudEndpoint(), {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...(CLOUD_SYNC_AUTH ? { authorization: CLOUD_SYNC_AUTH } : {}) },
+        headers: { 'content-type': 'application/json', ...(getCloudAuth() ? { authorization: getCloudAuth() } : {}) },
         body: JSON.stringify(rec),
       }).catch(() => {});
     } catch {}
@@ -2057,9 +2092,9 @@ function saveScore(name, score, route) {
 }
 
 function displayLeaderboard(filterRoute, skipRemote) {
-  if (!skipRemote && CLOUD_SYNC_ENDPOINT) {
+  if (!skipRemote && getCloudEndpoint()) {
     try {
-      fetch(CLOUD_SYNC_ENDPOINT, { headers: { ...(CLOUD_SYNC_AUTH ? { authorization: CLOUD_SYNC_AUTH } : {}) } })
+      fetch(getCloudEndpoint(), { headers: { ...(getCloudAuth() ? { authorization: getCloudAuth() } : {}) } })
         .then(r => r.json())
         .then((remote) => {
           if (Array.isArray(remote)) {
@@ -2424,7 +2459,7 @@ function renderSentenceQuestion() {
       if (currentQuestionIndex >= currentQuestions.length) {
         const pause = document.createElement('p');
         pause.className = 'dialog-text success-text';
-        matchScore += 10;
+        bumpScore(10);
         pause.textContent = '句讀精準！+10 分，第二關即將開始...';
         level.appendChild(pause);
         setTimeout(() => { level.style.display = 'none'; goToNextLevel(); }, 1500);
@@ -2548,7 +2583,7 @@ function renderExamAttempt() {
       handleError('Number');
       return;
     }
-    matchScore += 10;
+    bumpScore(10);
     const after = () => {
       level.innerHTML = '';
       if (currentExamAttempt <= 3) {
@@ -2976,7 +3011,7 @@ function startLetterMazeLevel() {
           }
           const gi = Number(currentLetterGoal) - 1;
           showBlockModal('提示', [{ text: goals[gi].feedback }]);
-          matchScore += 10;
+          bumpScore(10);
           state.achieved[type] = true;
           cell.classList.add('done');
           cell.textContent = '🚶';
@@ -3188,4 +3223,10 @@ function startDebugLevel() {
   matchScore = (n - 1) * 10;
   resetHpBar();
   startNumberLevel(n);
+}
+function getCloudEndpoint() {
+  try { return localStorage.getItem('hanliu_cloud_endpoint') || CLOUD_SYNC_ENDPOINT; } catch { return CLOUD_SYNC_ENDPOINT; }
+}
+function getCloudAuth() {
+  try { return localStorage.getItem('hanliu_cloud_auth') || CLOUD_SYNC_AUTH; } catch { return CLOUD_SYNC_AUTH; }
 }

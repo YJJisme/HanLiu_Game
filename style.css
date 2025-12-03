@@ -360,6 +360,13 @@ body {
   80% { opacity: 0.9; transform: translate(-50%, -16px); }
   100% { opacity: 0; transform: translate(-50%, -28px); }
 }
+ .score-bump { display: inline-block; animation: scoreTextFollow 800ms ease-out 1; }
+ @keyframes scoreTextFollow {
+   0% { transform: translateY(0); }
+   15% { transform: translateY(-2px); }
+   80% { transform: translateY(-12px); }
+   100% { transform: translateY(0); }
+ }
  
 #levelPoetry { padding-right: 160px; padding-bottom: 160px; }
 .maze-grid {
