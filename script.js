@@ -3267,6 +3267,11 @@ function getCloudAuth() {
 function openCloudConfig() {
   const main = document.querySelector('main.container');
   if (!main) return;
+  const backdrop = document.getElementById('modalBackdrop');
+  if (backdrop) backdrop.hidden = true;
+  const startScreen = document.getElementById('startScreen');
+  if (startScreen) startScreen.style.display = 'none';
+  clearMainContent(true);
   let sec = document.getElementById('cloudConfigDialog');
   if (!sec) {
     sec = document.createElement('section');
@@ -3303,7 +3308,7 @@ function openCloudConfig() {
   const close = document.createElement('button');
   close.className = 'button';
   close.type = 'button';
-  close.textContent = '關閉';
+  close.textContent = '返回首頁';
   save.addEventListener('click', () => {
     try { localStorage.setItem('hanliu_cloud_endpoint', epInput.value.trim()); } catch {}
     try { if (authInput.value.trim()) localStorage.setItem('hanliu_cloud_auth', authInput.value.trim()); else localStorage.removeItem('hanliu_cloud_auth'); } catch {}
@@ -3317,7 +3322,7 @@ function openCloudConfig() {
       .then(arr => { status.textContent = Array.isArray(arr) ? `連線成功，共有 ${arr.length} 筆資料` : '連線成功'; })
       .catch(() => { status.textContent = '連線失敗'; });
   });
-  close.addEventListener('click', () => { sec.remove(); });
+  close.addEventListener('click', () => { sec.remove(); const start = document.getElementById('startScreen'); if (start) start.style.display = ''; });
   actions.appendChild(save);
   actions.appendChild(test);
   actions.appendChild(close);
