@@ -3318,9 +3318,18 @@ function openCloudConfig() {
     const url = epInput.value.trim();
     if (!url) { status.textContent = '請先填入 Endpoint'; return; }
     fetch(url, { headers: { ...(authInput.value.trim() ? { authorization: authInput.value.trim() } : {}) } })
-      .then(r => r.json())
-      .then(arr => { status.textContent = Array.isArray(arr) ? `連線成功，共有 ${arr.length} 筆資料` : '連線成功'; })
-      .catch(() => { status.textContent = '連線失敗'; });
+      .then(async (r) => {
+        const txt = await r.text().catch(() => '');
+        if (!r.ok) {
+          status.textContent = `連線失敗：HTTP ${r.status} ${r.statusText}${txt ? '｜' + txt.slice(0, 160) : ''}`;
+          return;
+        }
+        let data = null;
+        try { data = JSON.parse(txt); } catch { data = null; }
+        if (Array.isArray(data)) status.textContent = `連線成功，共有 ${data.length} 筆資料`;
+        else status.textContent = '連線成功';
+      })
+      .catch((err) => { status.textContent = `連線失敗：${String(err && err.message || err)}`; });
   });
   close.addEventListener('click', () => { sec.remove(); const start = document.getElementById('startScreen'); if (start) start.style.display = ''; });
   actions.appendChild(save);
