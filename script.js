@@ -2577,6 +2577,28 @@ function startExamLevel() {
   renderExamAttempt();
 }
 
+function getSceneImageUrl(key) {
+  try {
+    const mapRaw = localStorage.getItem('hanliu_scene_images') || '{}';
+    const map = JSON.parse(mapRaw);
+    if (map && typeof map[key] === 'string' && map[key].trim()) return map[key].trim();
+  } catch {}
+  if (key === 'luliang') return 'images/luliang.png';
+  return '';
+}
+function resolveSceneImage(img, key) {
+  const seen = new Set();
+  const candidates = [];
+  const fromLocal = getSceneImageUrl(key);
+  if (fromLocal) candidates.push(fromLocal);
+  candidates.push(`images/${key}.png`, `${key}.png`, `./${key}.png`);
+  const list = candidates.filter((x) => { const y = String(x || '').trim(); if (!y || seen.has(y)) return false; seen.add(y); return true; });
+  let i = 0;
+  const tryNext = () => { if (i >= list.length) return; img.src = list[i++]; };
+  img.addEventListener('error', () => { tryNext(); }, { once: true });
+  tryNext();
+}
+
 function renderExamAttempt() {
   const main = document.querySelector('main.container');
   if (!main) return;
@@ -2669,6 +2691,17 @@ function renderExamAttempt() {
             inter.className = 'dialog-text';
             inter.textContent = '文名遠播，轉機已現 🧑‍💼 📚 陸贄、梁肅';
             level.appendChild(inter);
+            const pic = document.createElement('img');
+            pic.alt = '陸贄、梁肅';
+            pic.loading = 'lazy';
+            resolveSceneImage(pic, 'luliang');
+            pic.style.width = 'min(420px, 80vw)';
+            pic.style.maxHeight = '60vh';
+            pic.style.objectFit = 'contain';
+            pic.style.border = '1px solid #2a2a2a';
+            pic.style.borderRadius = '10px';
+            pic.style.boxShadow = '0 10px 24px rgba(0,0,0,0.35)';
+            level.appendChild(pic);
             setTimeout(() => { currentExamAttempt = 4; renderExamAttempt(); }, 3000);
           } else {
             currentExamAttempt += 1;
