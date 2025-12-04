@@ -2012,7 +2012,6 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     let list = arr;
     if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
     list.sort((a, b) => b.score - a.score);
-    list = list.slice(0, 30);
     const main = document.querySelector('main.container');
     const page = document.createElement('section');
     page.className = 'dialog-container';
@@ -2130,15 +2129,17 @@ function genRecordId() {
   return `hl-${t}-${rnd}`;
 }
 function dedupeRecords(list) {
-  const seen = new Set();
-  const out = [];
+  const byBase = new Map();
+  const norm = (v) => String(v == null ? '' : v).trim();
   list.forEach((r) => {
-    const id = r && r.id ? String(r.id) : `${r.name}|${r.score}|${r.route}|${r.time}|${r.progress}`;
-    if (seen.has(id)) return;
-    seen.add(id);
-    out.push(r);
+    const base = `${norm(r && r.name)}|${norm(r && r.route)}|${Number(r && r.score || 0)}`;
+    const cur = byBase.get(base);
+    if (!cur) { byBase.set(base, r); return; }
+    const tsCur = Number(cur.ts || 0);
+    const tsNew = Number(r.ts || 0);
+    if (tsNew > tsCur) byBase.set(base, r);
   });
-  return out;
+  return Array.from(byBase.values());
 }
 function saveScore(name, score, route) {
   const key = 'hanliu_scores';
