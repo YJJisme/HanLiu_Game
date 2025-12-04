@@ -175,6 +175,9 @@ body {
   gap: 1rem;
   padding: 2rem;
   text-align: center;
+  max-height: 90vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .dialog-text { max-width: 60ch; line-height: 1.8; color: var(--fg); }
