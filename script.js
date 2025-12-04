@@ -90,6 +90,8 @@ function systemCleanup(lockGame) { clearAllTimers(); if (lockGame === true) isGa
 function bumpScore(amount) {
   matchScore += amount;
   const bar = document.getElementById('hpBar');
+  const stEl = document.getElementById('scoreText');
+  if (stEl) stEl.textContent = String(matchScore || 0);
   if (!bar || amount === 0) return;
   const tip = document.createElement('div');
   tip.className = 'score-float';
@@ -489,57 +491,53 @@ function startBuddhaBoneLevel() {
       tokens.push(token); placed.push({ x, y });
     }
   }
-  function endP1(success) {
-    if (p1Ended) return;
-    p1Ended = true;
-    running = false;
-    clearInterval(spawnTimer);
-    if (endTimer) clearTimeout(endTimer);
-    activeItems().forEach(it => { if (!it.removed) { it.removed = true; p1.removeChild(it.el); } });
-    willpowerDebuff = !success;
-    const msg = success ? '意志阻擋成功' : '意志阻擋失敗';
-    if (success) {
-      const count = 28;
-      let done = 0;
-      const rainItems = [];
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('div');
-        el.className = 'fall-item';
-        el.textContent = '佛';
-        el.style.pointerEvents = 'none';
-        p1.appendChild(el);
-        const v = 0.12 + Math.random() * 0.18;
-        const it = { el, x: Math.random(), y: -0.1, v, reached: false };
-        el.style.left = (it.x * 100) + '%';
-        el.style.top = (it.y * 100) + '%';
-        rainItems.push(it);
+function endP1(success) {
+  if (p1Ended) return;
+  p1Ended = true;
+  running = false;
+  clearInterval(spawnTimer);
+  if (endTimer) clearTimeout(endTimer);
+  activeItems().forEach(it => { if (!it.removed) { it.removed = true; p1.removeChild(it.el); } });
+  willpowerDebuff = !success;
+  const msg = success ? '意志阻擋成功' : '意志阻擋失敗';
+  const count = 28;
+  let done = 0;
+  const rainItems = [];
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'fall-item';
+    el.textContent = '佛';
+    el.style.pointerEvents = 'none';
+    p1.appendChild(el);
+    const v = 0.12 + Math.random() * 0.18;
+    const it = { el, x: Math.random(), y: -0.1, v, reached: false };
+    el.style.left = (it.x * 100) + '%';
+    el.style.top = (it.y * 100) + '%';
+    rainItems.push(it);
+  }
+  let last = nowMs();
+  function rainLoop() {
+    const ts = nowMs();
+    const dt = Math.min(0.033, (ts - last) / 1000);
+    last = ts;
+    rainItems.forEach(it => {
+      if (it.reached) return;
+      it.y += it.v * dt;
+      it.el.style.top = (it.y * 100) + '%';
+      if (it.y >= 0.92) {
+        it.reached = true;
+        done += 1;
+        if (it.el.parentNode) p1.removeChild(it.el);
       }
-      let last = nowMs();
-      function rainLoop() {
-        const ts = nowMs();
-        const dt = Math.min(0.033, (ts - last) / 1000);
-        last = ts;
-        rainItems.forEach(it => {
-          if (it.reached) return;
-          it.y += it.v * dt;
-          it.el.style.top = (it.y * 100) + '%';
-          if (it.y >= 0.92) {
-            it.reached = true;
-            done += 1;
-            if (it.el.parentNode) p1.removeChild(it.el);
-          }
-        });
-        if (done < count) {
-          requestAnimationFrame(rainLoop);
-        } else {
-          showConfirmModal('提示', '佛骨進宮', '準備勸諫', () => { renderP2(); });
-        }
-      }
+    });
+    if (done < count) {
       requestAnimationFrame(rainLoop);
     } else {
-      showConfirmModal('提示', msg, '進入下一階段', () => { renderP2(); });
+      showConfirmModal('提示', '佛骨進宮', '準備勸諫', () => { renderP2(); });
     }
   }
+  requestAnimationFrame(rainLoop);
+}
   function spawnFo() {
     const el = document.createElement('div');
     el.className = 'fall-item';
@@ -578,13 +576,7 @@ function startBuddhaBoneLevel() {
       }
       if (it.y > 1.05 && !it.removed) {
         it.removed = true;
-        if (!it.caught) {
-          misses += 1;
-          handleError('Number');
-          willpowerDebuff = true;
-          endP1(false);
-          return;
-        }
+        if (!it.caught) { misses += 1; willpowerDebuff = true; }
         p1.removeChild(it.el);
       }
     });
@@ -595,7 +587,7 @@ function startBuddhaBoneLevel() {
   document.addEventListener('keydown', (ev) => { if (!running || isGameOver) return; if (ev.key === 'ArrowLeft' || ev.key === 'a') setCatcherX(ctrl.x - ctrl.speed); if (ev.key === 'ArrowRight' || ev.key === 'd') setCatcherX(ctrl.x + ctrl.speed); });
   p1.addEventListener('mousemove', (ev) => { const r = p1.getBoundingClientRect(); setCatcherX((ev.clientX - r.left) / r.width); });
   p1.addEventListener('touchmove', (ev) => { const t = ev.touches[0]; if (!t) return; const r = p1.getBoundingClientRect(); setCatcherX((t.clientX - r.left) / r.width); }, { passive: true });
-  showConfirmModal('提示', '準備好了嗎？', '準備好了', () => { running = true; lastTs = nowMs(); requestAnimationFrame(gameLoop); });
+  showConfirmModal('提示', '準備好了嗎？', '準備好了', () => { running = true; lastTs = nowMs(); endTimer = setTimeout(() => endP1(misses === 0), 10000); requestAnimationFrame(gameLoop); });
 
   function renderP2() {
     level.innerHTML = '';
@@ -856,6 +848,28 @@ function startCrocodileLevel() {
     else if (k === 'ArrowDown' || k === 's') { if (velocity.y !== -1) velocity = { x: 0, y: 1 }; }
   };
   document.addEventListener('keydown', keyListener, { passive: false });
+  let touchStart = null;
+  stage.addEventListener('touchstart', (ev) => {
+    const t = ev.touches[0];
+    if (!t) return;
+    touchStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+  stage.addEventListener('touchend', (ev) => {
+    if (!touchStart) return;
+    const t = ev.changedTouches && ev.changedTouches[0];
+    if (!t) { touchStart = null; return; }
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) { if (velocity.x !== 1) velocity = { x: -1, y: 0 }; }
+      else { if (velocity.x !== -1) velocity = { x: 1, y: 0 }; }
+    } else {
+      if (dy < 0) { if (velocity.y !== 1) velocity = { x: 0, y: -1 }; }
+      else { if (velocity.y !== -1) velocity = { x: 0, y: 1 }; }
+    }
+  }, { passive: true });
   gameLoop = trackedSetInterval(step, 1000 / 8);
   trackedSetInterval(() => {
     const now = performance.now();
@@ -2583,7 +2597,6 @@ function renderExamAttempt() {
       handleError('Number');
       return;
     }
-    bumpScore(10);
     const after = () => {
       level.innerHTML = '';
       if (currentExamAttempt <= 3) {
@@ -2614,6 +2627,7 @@ function renderExamAttempt() {
         final.className = 'dialog-text success-text';
         final.textContent = '貞元八年（792年），你終於中進士了！';
         level.appendChild(final);
+        bumpScore(10);
         setTimeout(() => { level.style.display = 'none'; goToNextLevel(); }, 1800);
       }
     };
@@ -3011,7 +3025,6 @@ function startLetterMazeLevel() {
           }
           const gi = Number(currentLetterGoal) - 1;
           showBlockModal('提示', [{ text: goals[gi].feedback }]);
-          bumpScore(10);
           state.achieved[type] = true;
           cell.classList.add('done');
           cell.textContent = '🚶';
@@ -3031,7 +3044,7 @@ function startLetterMazeLevel() {
           }
           cell.textContent = '🚶';
           playerPos = idx;
-          showBlockModal('提示', [{ text: finalGoal.feedback }], () => { level.style.display = 'none'; goToNextLevel(); });
+          showBlockModal('提示', [{ text: finalGoal.feedback }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
           return;
         }
       });
@@ -3140,6 +3153,8 @@ function showHpBar() {
   const bar = document.getElementById('hpBar');
   if (bar) bar.hidden = false;
   if (bar) {
+    let playerLabel = bar.querySelector('#playerLabel');
+    let playerNameText = bar.querySelector('#playerNameText');
     let scoreLabel = bar.querySelector('#scoreLabel');
     let scoreText = bar.querySelector('#scoreText');
     if (!scoreLabel) {
@@ -3148,6 +3163,20 @@ function showHpBar() {
       scoreLabel.className = 'hp-label';
       scoreLabel.textContent = '分數';
       bar.appendChild(scoreLabel);
+    }
+    if (!playerLabel) {
+      playerLabel = document.createElement('span');
+      playerLabel.id = 'playerLabel';
+      playerLabel.className = 'hp-label';
+      playerLabel.textContent = '玩家';
+      bar.appendChild(playerLabel);
+    }
+    if (!playerNameText) {
+      playerNameText = document.createElement('span');
+      playerNameText.id = 'playerNameText';
+      playerNameText.className = 'hp-text';
+      playerNameText.textContent = localStorage.getItem('hanliu_player_name') || '無名';
+      bar.appendChild(playerNameText);
     }
     if (!scoreText) {
       scoreText = document.createElement('span');
@@ -3172,6 +3201,8 @@ function showHpBar() {
       window.scoreDisplayIntervalId = trackedSetInterval(() => {
         const st = document.getElementById('scoreText');
         if (st) st.textContent = String(matchScore || 0);
+        const pn = document.getElementById('playerNameText');
+        if (pn) pn.textContent = localStorage.getItem('hanliu_player_name') || '無名';
       }, 300);
     }
   }
