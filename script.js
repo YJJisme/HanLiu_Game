@@ -870,7 +870,7 @@ function startCrocodileLevel() {
       else { if (velocity.y !== -1) velocity = { x: 0, y: 1 }; }
     }
   }, { passive: true });
-  gameLoop = trackedSetInterval(step, 1000 / 8);
+  gameLoop = trackedSetInterval(step, 1000 / 5);
   trackedSetInterval(() => {
     const now = performance.now();
     const idleMs = now - lastProgressAt;
@@ -1300,7 +1300,7 @@ function startHuaiXiLevel() {
   const distractNumbers = ['一','二','五','七','八','九','十','百','千','萬'];
   const specials = ['緩','繁'];
 
-  const q = sampleQuestions(huaiXiQuestions, 1)[0];
+  let q = sampleQuestions(huaiXiQuestions, 1)[0];
   const prompt = document.createElement('p');
   prompt.className = 'dialog-text';
   const masked = String(q.text).replace(/「[^」]*」/g, '「」');
@@ -1353,11 +1353,26 @@ function startHuaiXiLevel() {
           if (it.kind === 'target') {
             targetCaught = true;
             running = false;
-            showBlockModal('提示', [{ text: '目標已捕獲！' }], () => {
-              trackedSetTimeout(() => {
-                showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
-              }, 700);
-            });
+            if (needSecondChallenge) {
+              needSecondChallenge = false;
+              const prev = q;
+              const pool = huaiXiQuestions.filter(x => x !== prev);
+              q = sampleQuestions(pool, 1)[0];
+              const masked2 = String(q.text).replace(/「[^」]*」/g, '「」');
+              prompt.textContent = `挑戰：${masked2}`;
+              items.splice(0, items.length);
+              Array.from(stage.querySelectorAll('.fall-item')).forEach(el => stage.removeChild(el));
+              firstWaveTargetSpawned = false;
+              showBlockModal('提示', [{ text: '第一句完成，進入第二句軍情挑戰' }], () => {
+                showCountdown(() => { running = true; lastTs = nowMs(); requestAnimationFrame(gameLoop); });
+              });
+            } else {
+              showBlockModal('提示', [{ text: '目標已捕獲！' }], () => {
+                trackedSetTimeout(() => {
+                  showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+                }, 700);
+              });
+            }
           } else if (it.kind === 'slow') {
             running = false;
             slowUntil = nowMs() + 3000;
@@ -1423,7 +1438,7 @@ function startHuaiXiLevel() {
   function activeItems() { return items.filter(it => !it.removed && !it.caught); }
   const minSpacingX = 0.2;
   const maxActive = 3;
-  const spawnIntervalMs = 1400;
+  const spawnIntervalMs = 1800;
 
   function spawn(kind, text) {
     const el = document.createElement('div');
@@ -1444,16 +1459,14 @@ function startHuaiXiLevel() {
       kind,
       x: pickX(),
       y: -0.1,
-      v: 0.12 + rng() * 0.18,
+      v: 0.06 + rng() * 0.12,
       caught: false,
       removed: false,
     };
     el.style.left = (obj.x * 100) + '%';
     el.style.top = (obj.y * 100) + '%';
     items.push(obj);
-    if (endTimer === null) {
-      endTimer = trackedSetTimeout(() => { if (!p1Ended) endP1(misses === 0); }, 10000);
-    }
+    // 無限時：不設結束計時
   }
 
   const spawnTimer = trackedSetInterval(() => {
