@@ -3108,6 +3108,8 @@ rankHan.addEventListener('click', () => { displayLeaderboard('HanYu'); });
 rankLiu.addEventListener('click', () => { displayLeaderboard('LiuZongyuan'); });
 rankAll.addEventListener('click', () => { displayLeaderboard('All'); });
 document.getElementById('rankClear').addEventListener('click', clearLeaderboard);
+const cloudBtn = document.getElementById('cloudConfigBtn');
+if (cloudBtn) cloudBtn.addEventListener('click', openCloudConfig);
 const rankExportBtn = document.getElementById('rankExport');
 const rankImportBtn = document.getElementById('rankImport');
 const rankFileInput = document.getElementById('rankFile');
@@ -3260,4 +3262,68 @@ function getCloudEndpoint() {
 }
 function getCloudAuth() {
   try { return localStorage.getItem('hanliu_cloud_auth') || CLOUD_SYNC_AUTH; } catch { return CLOUD_SYNC_AUTH; }
+}
+
+function openCloudConfig() {
+  const main = document.querySelector('main.container');
+  if (!main) return;
+  let sec = document.getElementById('cloudConfigDialog');
+  if (!sec) {
+    sec = document.createElement('section');
+    sec.className = 'dialog-container';
+    sec.id = 'cloudConfigDialog';
+    main.appendChild(sec);
+  }
+  sec.innerHTML = '';
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '雲端排行榜設定';
+  const epInput = document.createElement('input');
+  epInput.className = 'input';
+  epInput.type = 'text';
+  epInput.placeholder = 'Endpoint，例如 https://xxx.workers.dev/scores';
+  epInput.value = getCloudEndpoint() || '';
+  const authInput = document.createElement('input');
+  authInput.className = 'input';
+  authInput.type = 'text';
+  authInput.placeholder = 'Authorization（可空），例如 Bearer xxx';
+  authInput.value = getCloudAuth() || '';
+  const status = document.createElement('p');
+  status.className = 'dialog-text';
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const save = document.createElement('button');
+  save.className = 'button';
+  save.type = 'button';
+  save.textContent = '保存';
+  const test = document.createElement('button');
+  test.className = 'button';
+  test.type = 'button';
+  test.textContent = '測試連線';
+  const close = document.createElement('button');
+  close.className = 'button';
+  close.type = 'button';
+  close.textContent = '關閉';
+  save.addEventListener('click', () => {
+    try { localStorage.setItem('hanliu_cloud_endpoint', epInput.value.trim()); } catch {}
+    try { if (authInput.value.trim()) localStorage.setItem('hanliu_cloud_auth', authInput.value.trim()); else localStorage.removeItem('hanliu_cloud_auth'); } catch {}
+    status.textContent = '已保存';
+  });
+  test.addEventListener('click', () => {
+    const url = epInput.value.trim();
+    if (!url) { status.textContent = '請先填入 Endpoint'; return; }
+    fetch(url, { headers: { ...(authInput.value.trim() ? { authorization: authInput.value.trim() } : {}) } })
+      .then(r => r.json())
+      .then(arr => { status.textContent = Array.isArray(arr) ? `連線成功，共有 ${arr.length} 筆資料` : '連線成功'; })
+      .catch(() => { status.textContent = '連線失敗'; });
+  });
+  close.addEventListener('click', () => { sec.remove(); });
+  actions.appendChild(save);
+  actions.appendChild(test);
+  actions.appendChild(close);
+  sec.appendChild(title);
+  sec.appendChild(epInput);
+  sec.appendChild(authInput);
+  sec.appendChild(status);
+  sec.appendChild(actions);
 }
