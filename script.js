@@ -12,7 +12,7 @@ const debugLevelInput = document.getElementById('debugLevelInput');
 const debugStartBtn = document.getElementById('debugStartBtn');
 const DEV_PASSWORD = '3637';
 let devModeEnabled = false;
-const CLOUD_SYNC_ENDPOINT = '';
+const CLOUD_SYNC_ENDPOINT = 'https://hanliu-leaderboard.50327willy50327.workers.dev/scores';
 const CLOUD_SYNC_AUTH = '';
 const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
@@ -3151,6 +3151,14 @@ if (globalBgmToggle) {
   globalBgmToggle.textContent = bgmEnabled ? '♪' : '🔇';
   globalBgmToggle.addEventListener('click', toggleBgm);
 }
+// 自動從網址參數寫入雲端設定（避免每台裝置手動輸入）。
+try {
+  const sp = new URLSearchParams(location.search);
+  const ep = sp.get('cloud_endpoint');
+  const au = sp.get('cloud_auth');
+  if (ep) localStorage.setItem('hanliu_cloud_endpoint', ep);
+  if (au) localStorage.setItem('hanliu_cloud_auth', au);
+} catch {}
 function showHpBar() {
   const bar = document.getElementById('hpBar');
   if (bar) bar.hidden = false;
