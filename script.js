@@ -1979,7 +1979,7 @@ function startLevel10() {
 
   window.level10Reset = levelRetry;
 }
-function renderLeaderboardPage(filterRoute, headingText) {
+function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
   clearMainContent(true);
   hideCharacterDisplay();
   hideHpBar();
@@ -1987,69 +1987,90 @@ function renderLeaderboardPage(filterRoute, headingText) {
   document.documentElement.style.setProperty('--fg', '#cfcfcf');
   document.documentElement.style.setProperty('--muted', '#9aa0a6');
   const key = 'hanliu_scores';
-  const raw = localStorage.getItem(key);
-  let arr = [];
-  try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
-  let list = arr;
-  if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
-  list.sort((a, b) => b.score - a.score);
-  list = list.slice(0, 30);
-  const main = document.querySelector('main.container');
-  const page = document.createElement('section');
-  page.className = 'dialog-container';
-  page.id = 'leaderboardPage';
-  const title = document.createElement('h2');
-  title.className = 'modal-title';
-  title.textContent = '排行榜';
-  const info = document.createElement('p');
-  info.className = 'dialog-text';
-  info.textContent = headingText || '';
-  const content = document.createElement('div');
-  content.className = 'leaderboard-content';
-  if (list.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'dialog-text';
-    empty.textContent = '尚無成績記錄';
-    content.appendChild(empty);
-  } else {
-    list.forEach((r, i) => {
-      const row = document.createElement('div');
-      row.className = 'row';
-      const name = document.createElement('span');
-      name.className = 'name';
-      name.textContent = `${i + 1}. ${r.name}`;
-      const score = document.createElement('span');
-      score.className = 'score';
-      score.textContent = `${r.score}`;
-      const route = document.createElement('span');
-      route.className = 'route';
-      route.textContent = r.route === 'HanYu' ? '韓愈線' : (r.route === 'LiuZongyuan' ? '柳宗元線' : r.route);
-      row.appendChild(name);
-      row.appendChild(score);
-      row.appendChild(route);
-      content.appendChild(row);
-    });
+  const renderLocal = () => {
+    const raw = localStorage.getItem(key);
+    let arr = [];
+    try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
+    let list = arr;
+    if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
+    list.sort((a, b) => b.score - a.score);
+    list = list.slice(0, 30);
+    const main = document.querySelector('main.container');
+    const page = document.createElement('section');
+    page.className = 'dialog-container';
+    page.id = 'leaderboardPage';
+    const title = document.createElement('h2');
+    title.className = 'modal-title';
+    title.textContent = '排行榜';
+    const info = document.createElement('p');
+    info.className = 'dialog-text';
+    info.textContent = headingText || '';
+    const content = document.createElement('div');
+    content.className = 'leaderboard-content';
+    if (list.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'dialog-text';
+      empty.textContent = '尚無成績記錄';
+      content.appendChild(empty);
+    } else {
+      list.forEach((r, i) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = `${i + 1}. ${r.name}`;
+        const score = document.createElement('span');
+        score.className = 'score';
+        score.textContent = `${r.score}`;
+        const route = document.createElement('span');
+        route.className = 'route';
+        route.textContent = r.route === 'HanYu' ? '韓愈線' : (r.route === 'LiuZongyuan' ? '柳宗元線' : r.route);
+        row.appendChild(name);
+        row.appendChild(score);
+        row.appendChild(route);
+        content.appendChild(row);
+      });
+    }
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const backBtn = document.createElement('button');
+    backBtn.className = 'button';
+    backBtn.type = 'button';
+    backBtn.textContent = '返回主頁';
+    backBtn.addEventListener('click', navigateHome);
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'button';
+    retryBtn.type = 'button';
+    retryBtn.textContent = '重來一次';
+    retryBtn.addEventListener('click', retryGame);
+    actions.appendChild(backBtn);
+    actions.appendChild(retryBtn);
+    page.appendChild(title);
+    if (headingText) page.appendChild(info);
+    page.appendChild(content);
+    page.appendChild(actions);
+    backdrop.hidden = true;
+    main.appendChild(page);
+  };
+  if (!skipRemote && getCloudEndpoint()) {
+    try {
+      fetch(getCloudEndpoint(), { headers: { ...(getCloudAuth() ? { authorization: getCloudAuth() } : {}) } })
+        .then(r => r.json())
+        .then((remote) => {
+          if (Array.isArray(remote)) {
+            const raw = localStorage.getItem(key);
+            let arr = [];
+            try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
+            const merged = dedupeRecords(arr.concat(remote));
+            localStorage.setItem(key, JSON.stringify(merged));
+          }
+          renderLocal();
+        })
+        .catch(() => { renderLocal(); });
+    } catch { renderLocal(); }
+    return;
   }
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-  const backBtn = document.createElement('button');
-  backBtn.className = 'button';
-  backBtn.type = 'button';
-  backBtn.textContent = '返回主頁';
-  backBtn.addEventListener('click', navigateHome);
-  const retryBtn = document.createElement('button');
-  retryBtn.className = 'button';
-  retryBtn.type = 'button';
-  retryBtn.textContent = '重來一次';
-  retryBtn.addEventListener('click', retryGame);
-  actions.appendChild(backBtn);
-  actions.appendChild(retryBtn);
-  page.appendChild(title);
-  if (headingText) page.appendChild(info);
-  page.appendChild(content);
-  page.appendChild(actions);
-  backdrop.hidden = true;
-  main.appendChild(page);
+  renderLocal();
 }
 
 function clearMainContent(preserveStartScreen) {
@@ -2084,6 +2105,23 @@ function retryGame() {
   input.focus();
 }
 let leaderboardFilter = 'All';
+function genRecordId() {
+  try { if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch {}
+  const rnd = Math.random().toString(36).slice(2);
+  const t = Date.now();
+  return `hl-${t}-${rnd}`;
+}
+function dedupeRecords(list) {
+  const seen = new Set();
+  const out = [];
+  list.forEach((r) => {
+    const id = r && r.id ? String(r.id) : `${r.name}|${r.score}|${r.route}|${r.time}|${r.progress}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push(r);
+  });
+  return out;
+}
 function saveScore(name, score, route) {
   const key = 'hanliu_scores';
   const raw = localStorage.getItem(key);
@@ -2091,9 +2129,9 @@ function saveScore(name, score, route) {
   try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
   const now = Date.now();
   const totalSeconds = startTime ? Math.max(0, Math.floor((now - startTime) / 1000)) : 0;
-  const rec = { name, score, route, time: totalSeconds, progress: currentProgress };
+  const rec = { id: genRecordId(), name, score, route, time: totalSeconds, progress: currentProgress, ts: now };
   arr.push(rec);
-  localStorage.setItem(key, JSON.stringify(arr));
+  localStorage.setItem(key, JSON.stringify(dedupeRecords(arr)));
   if (getCloudEndpoint()) {
     try {
       fetch(getCloudEndpoint(), {
@@ -2116,7 +2154,7 @@ function displayLeaderboard(filterRoute, skipRemote) {
             const raw = localStorage.getItem(key);
             let arr = [];
             try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
-            const merged = arr.concat(remote);
+            const merged = dedupeRecords(arr.concat(remote));
             localStorage.setItem(key, JSON.stringify(merged));
           }
           displayLeaderboard(filterRoute, true);
@@ -2185,6 +2223,22 @@ function clearLeaderboard() {
     displayLeaderboard(leaderboardFilter);
   });
 }
+function clearLeaderboardAll() {
+  requirePassword(() => {
+    const ep = getCloudEndpoint();
+    const auth = getCloudAuth();
+    const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, true); };
+    if (ep) {
+      try {
+        fetch(ep, { method: 'DELETE', headers: { ...(auth ? { authorization: auth } : {}) } })
+          .then(() => { done(); })
+          .catch(() => { done(); });
+      } catch { done(); }
+      return;
+    }
+    done();
+  });
+}
 function exportLeaderboard() {
   const raw = localStorage.getItem('hanliu_scores') || '[]';
   const blob = new Blob([raw], { type: 'application/json' });
@@ -2208,7 +2262,7 @@ function importLeaderboard(ev) {
       const raw = localStorage.getItem(key);
       let arr = [];
       try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
-      const merged = Array.isArray(incoming) ? arr.concat(incoming) : arr;
+      const merged = Array.isArray(incoming) ? dedupeRecords(arr.concat(incoming)) : arr;
       localStorage.setItem(key, JSON.stringify(merged));
       displayLeaderboard(leaderboardFilter);
     } catch {}
@@ -3108,6 +3162,8 @@ rankHan.addEventListener('click', () => { displayLeaderboard('HanYu'); });
 rankLiu.addEventListener('click', () => { displayLeaderboard('LiuZongyuan'); });
 rankAll.addEventListener('click', () => { displayLeaderboard('All'); });
 document.getElementById('rankClear').addEventListener('click', clearLeaderboard);
+const rankClearAllBtn = document.getElementById('rankClearAll');
+if (rankClearAllBtn) rankClearAllBtn.addEventListener('click', clearLeaderboardAll);
 const cloudBtn = document.getElementById('cloudConfigBtn');
 if (cloudBtn) cloudBtn.addEventListener('click', openCloudConfig);
 const rankExportBtn = document.getElementById('rankExport');
