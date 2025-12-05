@@ -18,8 +18,8 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.0.2';
-let releaseNotes = ['公告改為獨立入口與頁面','啟用版本號遞增與公告同步','修復排行榜清除與一鍵清除功能'];
+let appVersion = '1.0.3';
+let releaseNotes = ['恢復清除需要密碼驗證','強化雲端排行榜清除，避免刷新回填','公告維持獨立入口'];
 
 let matchScore = 0;
 let errorCount = 0;
@@ -2296,36 +2296,44 @@ function formatTime(totalSeconds) {
 }
 
 function clearLeaderboard() {
-  showConfirmModal('確認清除', '僅清除本機排行榜', '清除', () => {
+  requirePassword(() => {
     localStorage.removeItem('hanliu_scores');
     displayLeaderboard(leaderboardFilter, true);
   });
 }
-function clearLeaderboardAll() {
-  showConfirmModal('確認清除', '清除本機與雲端排行榜', '清除', () => {
-    const ep = getCloudEndpoint();
-    const auth = getCloudAuth();
-    const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, true); };
-    if (ep) {
-      const baseHeaders = { ...(auth ? { authorization: auth } : {}) };
-      const jsonHeaders = { 'content-type': 'application/json', ...(auth ? { authorization: auth } : {}) };
-      const tryDelete = () => fetch(ep, { method: 'DELETE', headers: baseHeaders, mode: 'cors', keepalive: true });
-      const tryPostOverride = () => fetch(ep, { method: 'POST', headers: jsonHeaders, mode: 'cors', keepalive: true, body: JSON.stringify({ action: 'clear_all' }) });
-      const tryPutEmpty = () => fetch(ep, { method: 'PUT', headers: jsonHeaders, mode: 'cors', keepalive: true, body: '[]' });
-      tryDelete()
-        .then(() => { done(); })
-        .catch(() => {
-          tryPostOverride()
-            .then(() => { done(); })
-            .catch(() => {
-              tryPutEmpty()
-                .then(() => { done(); })
-                .catch(() => { done(); });
-            });
-        });
-      return;
+async function wipeCloudScores() {
+  const ep = getCloudEndpoint();
+  const auth = getCloudAuth();
+  if (!ep) return;
+  const headers = { ...(auth ? { authorization: auth } : {}) };
+  const jsonHeaders = { 'content-type': 'application/json', ...(auth ? { authorization: auth } : {}) };
+  let list = null;
+  try {
+    const r = await fetch(ep, { headers });
+    const txt = await r.text();
+    try { list = JSON.parse(txt); } catch { list = null; }
+  } catch {}
+  const bulkDelete = () => fetch(ep, { method: 'DELETE', headers, mode: 'cors', keepalive: true });
+  const bulkPost = () => fetch(ep, { method: 'POST', headers: jsonHeaders, mode: 'cors', keepalive: true, body: JSON.stringify({ action: 'clear_all' }) });
+  const bulkPut = () => fetch(ep, { method: 'PUT', headers: jsonHeaders, mode: 'cors', keepalive: true, body: '[]' });
+  try { await bulkDelete(); } catch {}
+  if (Array.isArray(list) && list.length) {
+    for (const it of list) {
+      const id = String(it && it.id || '').trim();
+      if (!id) continue;
+      try { await fetch(`${ep.replace(/\/$/, '')}/${encodeURIComponent(id)}`, { method: 'DELETE', headers, mode: 'cors', keepalive: true }); }
+      catch {
+        try { await fetch(ep, { method: 'POST', headers: jsonHeaders, mode: 'cors', keepalive: true, body: JSON.stringify({ action: 'delete', id }) }); } catch {}
+      }
     }
-    done();
+  }
+  try { await bulkPost(); } catch {}
+  try { await bulkPut(); } catch {}
+}
+function clearLeaderboardAll() {
+  requirePassword(() => {
+    const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, true); };
+    wipeCloudScores().then(() => { done(); }).catch(() => { done(); });
   });
 }
 function exportLeaderboard() {
@@ -3506,6 +3514,10 @@ function openCloudConfig() {
   test.className = 'button';
   test.type = 'button';
   test.textContent = '測試連線';
+  const wipe = document.createElement('button');
+  wipe.className = 'button';
+  wipe.type = 'button';
+  wipe.textContent = '清除雲端全部';
   const close = document.createElement('button');
   close.className = 'button';
   close.type = 'button';
@@ -3532,9 +3544,21 @@ function openCloudConfig() {
       })
       .catch((err) => { status.textContent = `連線失敗：${String(err && err.message || err)}`; });
   });
+  wipe.addEventListener('click', () => {
+    const url = epInput.value.trim();
+    const authVal = authInput.value.trim();
+    if (!url) { status.textContent = '請先填入 Endpoint'; return; }
+    try { localStorage.setItem('hanliu_cloud_endpoint', url); } catch {}
+    try { if (authVal) localStorage.setItem('hanliu_cloud_auth', authVal); else localStorage.removeItem('hanliu_cloud_auth'); } catch {}
+    status.textContent = '正在清除雲端...';
+    wipeCloudScores()
+      .then(() => { status.textContent = '雲端已清除'; })
+      .catch((err) => { status.textContent = `清除失敗：${String(err && err.message || err)}`; });
+  });
   close.addEventListener('click', () => { sec.remove(); const start = document.getElementById('startScreen'); if (start) start.style.display = ''; });
   actions.appendChild(save);
   actions.appendChild(test);
+  actions.appendChild(wipe);
   actions.appendChild(close);
   sec.appendChild(title);
   sec.appendChild(epInput);
