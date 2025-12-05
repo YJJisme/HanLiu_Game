@@ -2983,10 +2983,24 @@ function showBlockModal(titleText, bodyItems, onClose) {
   modal.appendChild(title);
   if (Array.isArray(bodyItems)) {
     bodyItems.forEach(item => {
-      const p = document.createElement('p');
-      p.className = item.className || 'dialog-text';
-      p.textContent = item.text || '';
-      modal.appendChild(p);
+      if (item && item.image) {
+        const img = document.createElement('img');
+        img.className = 'illustration';
+        img.src = item.image;
+        img.alt = item.alt || '';
+        modal.appendChild(img);
+        if (item.text) {
+          const p = document.createElement('p');
+          p.className = item.className || 'dialog-text';
+          p.textContent = item.text;
+          modal.appendChild(p);
+        }
+      } else {
+        const p = document.createElement('p');
+        p.className = item.className || 'dialog-text';
+        p.textContent = item.text || '';
+        modal.appendChild(p);
+      }
     });
   }
   const actions = document.createElement('div');
@@ -3242,7 +3256,7 @@ function startLetterMazeLevel() {
           }
           cell.textContent = '🚶';
           playerPos = idx;
-          showBlockModal('提示', [{ text: finalGoal.feedback }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+          showBlockModal('通關', [{ image: 'Mansion.png', alt: '宰相公府大門', text: finalGoal.feedback }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
           return;
         }
       });

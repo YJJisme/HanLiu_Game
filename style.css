@@ -5,6 +5,8 @@
   --surface: #111112;
   --accent: #6ea3b5;
   --title: #ffffff;
+  --bg-image: none;
+  --bg-overlay: none;
 }
 
 * { box-sizing: border-box; }
@@ -12,7 +14,7 @@ html, body { height: 100%; overflow: hidden; }
 body {
   margin: 0;
   background-color: var(--bg);
-  background-image: var(--bg-image);
+  background-image: var(--bg-overlay), var(--bg-image, none);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -171,6 +173,15 @@ body {
 .modal.hc3 .modal-title { color: #ffffff; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 .modal.hc3 .dialog-text { color: #f1f5f9; font-weight: 900; letter-spacing: 0.04em; text-shadow: 0 1px 0 rgba(0,0,0,0.35); }
 
+.illustration {
+  width: min(720px, 92vw);
+  max-height: 70vh;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #2a2a2a;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.45);
+}
+
 .dialog-container {
   display: flex;
   flex-direction: column;
@@ -186,6 +197,7 @@ body {
 
 .dialog-text { max-width: 60ch; line-height: 1.8; color: var(--fg); }
 .dialog-text { overflow-wrap: anywhere; word-break: break-word; }
+.dialog-container .dialog-text { color: #e6edf5; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 1px 0 rgba(0,0,0,0.35); }
 .dialog-container > * { max-width: 92vw; }
 
 .choices { display: flex; gap: 0.75rem; justify-content: center; }
@@ -346,7 +358,7 @@ body {
 .idea-ok:hover { border-color: #a4d3e2; }
 
  
-.modal-title { margin: 0 0 1rem; font-size: 1.7rem; letter-spacing: 0.12em; color: var(--title); text-align: center; font-weight: 900; text-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+.modal-title { margin: 0 0 1rem; font-size: 1.9rem; letter-spacing: 0.12em; color: var(--title); text-align: center; font-weight: 900; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .modal .dialog-text { color: #f1f5f9; font-size: 1.15rem; font-weight: 900; letter-spacing: 0.04em; text-shadow: 0 1px 0 rgba(0,0,0,0.35); }
 
 /* 分數浮動提示 */
@@ -538,7 +550,7 @@ body {
 }
 .dialog-container .seg-char { color: #0b1f3a !important; }
 .hint-text { color: #4a5b6b; }
-#startScreen .title { color: #ffffff; text-shadow: 0 2px 10px rgba(0,0,0,0.55); }
-#startScreen .intro { color: #f1f5f9; text-shadow: 0 2px 10px rgba(0,0,0,0.45); }
+#startScreen .title { color: #ffffff; font-weight: 900; text-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+#startScreen .intro { color: #f1f5f9; font-size: 1.2rem; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 #startScreen .input { background: rgba(0,0,0,0.5); border-color: #335; color: #ffffff; }
 #startScreen .button { background: linear-gradient(180deg, rgba(24,26,28,0.92), rgba(18,19,21,0.92)); border-color: #335; }
