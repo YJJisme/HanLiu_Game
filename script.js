@@ -1229,24 +1229,24 @@ function startPoetryLevel() {
     prompt.className = 'dialog-text';
     prompt.textContent = 'Q2：詩句填空';
     level.appendChild(prompt);
-    const missingIndex = Math.floor(Math.random() * q2Poem.lines.length);
-    const displayLines = q2Poem.lines.map((ln, i) => (i === missingIndex ? '______' : ln));
+    const clauses = extractClauses(q2Poem.full_text);
+    const picked = Math.max(0, Math.floor(Math.random() * Math.max(1, clauses.length)));
     const content = document.createElement('p');
     content.className = 'dialog-text';
-    content.innerHTML = displayLines.join('<br>');
+    content.innerHTML = clauses.map((c, i) => (i === picked ? `______${c.punct}` : `${c.text}${c.punct}`)).join('');
     level.appendChild(content);
     const options = document.createElement('div');
     options.className = 'options';
-    const otherLines = poetryLevelQuestions.filter(p => p !== q2Poem).flatMap(p => p.lines);
-    const distractorLines = shuffleArray(otherLines.filter(ln => ln !== q2Poem.lines[missingIndex])).slice(0, 3);
-    const all = shuffleArray([q2Poem.lines[missingIndex], ...distractorLines]);
+    const otherClauses = poetryLevelQuestions.filter(p => p !== q2Poem).flatMap(p => extractClauses(p.full_text).map(x => x.text));
+    const distractorLines = shuffleArray(Array.from(new Set(otherClauses)).filter(ln => ln && ln !== clauses[picked].text)).slice(0, 3);
+    const all = shuffleArray([clauses[picked].text, ...distractorLines]);
     all.forEach(line => {
       const btn = document.createElement('button');
       btn.className = 'button option';
       btn.type = 'button';
       btn.textContent = line;
       btn.addEventListener('click', () => {
-        const ok = line === q2Poem.lines[missingIndex];
+        const ok = line === clauses[picked].text;
         if (ok) {
           bumpScore(10);
           showBlockModal('通關', [{ text: '文成！韓愈與孟郊月下推敲，將一起開創盛唐之後的另一番氣象。' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
@@ -2013,6 +2013,7 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
     list.sort((a, b) => b.score - a.score);
     const main = document.querySelector('main.container');
+    if (main) { main.style.alignItems = 'flex-start'; main.style.justifyItems = 'center'; main.scrollTop = 0; }
     const page = document.createElement('section');
     page.className = 'dialog-container';
     page.id = 'leaderboardPage';
@@ -2068,6 +2069,7 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     page.appendChild(actions);
     backdrop.hidden = true;
     main.appendChild(page);
+    page.scrollTop = 0;
   };
   if (!skipRemote && getCloudEndpoint()) {
     try {
@@ -2108,6 +2110,7 @@ function navigateHome() {
   document.documentElement.style.setProperty('--bg', '#1a1a1a');
   document.documentElement.style.setProperty('--fg', '#cfcfcf');
   document.documentElement.style.setProperty('--muted', '#9aa0a6');
+  if (main) { main.style.alignItems = ''; main.style.justifyItems = ''; }
   hideHpBar();
   isGameOver = false;
   systemCleanup(false);
@@ -2759,6 +2762,17 @@ function getCjkIndices(text) {
   const re = /[\u4E00-\u9FFF]/;
   const out = [];
   for (let i = 0; i < text.length; i++) { if (re.test(text[i])) out.push(i); }
+  return out;
+}
+
+function extractClauses(text) {
+  const re = /([^，、；。！？]+)([，、；。！？])/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(String(text))) !== null) {
+    out.push({ text: String(m[1]).trim(), punct: String(m[2]) });
+  }
+  if (out.length === 0) return [{ text: String(text), punct: '' }];
   return out;
 }
 
