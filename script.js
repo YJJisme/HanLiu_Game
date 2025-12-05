@@ -18,6 +18,8 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
+let appVersion = '1.0.2';
+let releaseNotes = ['公告改為獨立入口與頁面','啟用版本號遞增與公告同步','修復排行榜清除與一鍵清除功能'];
 
 let matchScore = 0;
 let errorCount = 0;
@@ -2124,6 +2126,41 @@ function navigateHome() {
   systemCleanup(false);
 }
 
+function openNotice() {
+  const main = document.querySelector('main.container');
+  const start = document.getElementById('startScreen');
+  if (start) start.style.display = 'none';
+  clearMainContent(true);
+  const page = document.createElement('section');
+  page.className = 'dialog-container';
+  page.style.maxHeight = '90vh';
+  page.style.overflow = 'auto';
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '公告';
+  const ver = document.createElement('p');
+  ver.className = 'dialog-text';
+  ver.textContent = `版本：${appVersion}`;
+  page.appendChild(title);
+  page.appendChild(ver);
+  releaseNotes.forEach(n => {
+    const p = document.createElement('p');
+    p.className = 'dialog-text';
+    p.textContent = `• ${n}`;
+    page.appendChild(p);
+  });
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const backBtn = document.createElement('button');
+  backBtn.className = 'button';
+  backBtn.type = 'button';
+  backBtn.textContent = '返回主頁';
+  backBtn.addEventListener('click', navigateHome);
+  actions.appendChild(backBtn);
+  page.appendChild(actions);
+  main.appendChild(page);
+}
+
 function retryGame() {
   matchScore = 0;
   errorCount = 0;
@@ -2259,16 +2296,16 @@ function formatTime(totalSeconds) {
 }
 
 function clearLeaderboard() {
-  requirePassword(() => {
+  showConfirmModal('確認清除', '僅清除本機排行榜', '清除', () => {
     localStorage.removeItem('hanliu_scores');
-    displayLeaderboard(leaderboardFilter);
+    displayLeaderboard(leaderboardFilter, true);
   });
 }
 function clearLeaderboardAll() {
-  requirePassword(() => {
+  showConfirmModal('確認清除', '清除本機與雲端排行榜', '清除', () => {
     const ep = getCloudEndpoint();
     const auth = getCloudAuth();
-    const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, false); };
+    const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, true); };
     if (ep) {
       const baseHeaders = { ...(auth ? { authorization: auth } : {}) };
       const jsonHeaders = { 'content-type': 'application/json', ...(auth ? { authorization: auth } : {}) };
@@ -3268,6 +3305,8 @@ const rankExportBtn = document.getElementById('rankExport');
 const rankImportBtn = document.getElementById('rankImport');
 const rankFileInput = document.getElementById('rankFile');
 if (rankExportBtn) rankExportBtn.addEventListener('click', exportLeaderboard);
+const noticeBtn = document.getElementById('noticeBtn');
+if (noticeBtn) noticeBtn.addEventListener('click', openNotice);
 if (rankImportBtn) rankImportBtn.addEventListener('click', () => { if (rankFileInput) rankFileInput.click(); });
 if (rankFileInput) rankFileInput.addEventListener('change', importLeaderboard);
 aboutBtn.addEventListener('click', openAbout);
