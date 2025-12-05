@@ -2129,17 +2129,28 @@ function genRecordId() {
   return `hl-${t}-${rnd}`;
 }
 function dedupeRecords(list) {
+  const byId = new Map();
+  const rest = [];
+  list.forEach((r) => {
+    const id = String(r && r.id || '').trim();
+    if (id) {
+      const cur = byId.get(id);
+      if (!cur || Number(r.ts || 0) > Number(cur.ts || 0)) byId.set(id, r);
+    } else {
+      rest.push(r);
+    }
+  });
   const byBase = new Map();
   const norm = (v) => String(v == null ? '' : v).trim();
-  list.forEach((r) => {
-    const base = `${norm(r && r.name)}|${norm(r && r.route)}|${Number(r && r.score || 0)}`;
+  rest.forEach((r) => {
+    const base = `${norm(r && r.name)}|${norm(r && r.route)}|${Number(r && r.score || 0)}|${Number(r && r.time || 0)}`;
     const cur = byBase.get(base);
-    if (!cur) { byBase.set(base, r); return; }
-    const tsCur = Number(cur.ts || 0);
-    const tsNew = Number(r.ts || 0);
-    if (tsNew > tsCur) byBase.set(base, r);
+    if (!cur || Number(r.ts || 0) > Number(cur.ts || 0)) byBase.set(base, r);
   });
-  return Array.from(byBase.values());
+  const out = [];
+  byId.forEach((v) => { out.push(v); });
+  byBase.forEach((v) => { out.push(v); });
+  return out;
 }
 function saveScore(name, score, route) {
   const key = 'hanliu_scores';
