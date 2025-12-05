@@ -18,8 +18,8 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.0.3';
-let releaseNotes = ['恢復清除需要密碼驗證','強化雲端排行榜清除，避免刷新回填','公告維持獨立入口'];
+let appVersion = '1.0.4';
+let releaseNotes = ['測試卡暱稱顯示「測試卡」','套用冰室照片作為背景','第九關改為段落排序'];
 
 let matchScore = 0;
 let errorCount = 0;
@@ -905,107 +905,116 @@ function startEpitaphLevel() {
 
   const intro = document.createElement('p');
   intro.className = 'dialog-text';
-  intro.textContent = '請精確輸入下列文本（含標點）：';
+  intro.textContent = '請將段落排序成完整文章：';
   level.appendChild(intro);
 
-  const targetText = '子厚，諱宗元。七世祖慶，為拓跋魏侍中，封濟陰公。曾伯祖奭，為唐宰相，與褚遂良、韓瑗俱得罪武后，死高宗朝。皇考諱鎮，以事母棄太常博士，求為縣令江南。其後以不能媚權貴，失禦史。權貴人死，乃複拜侍御史。號為剛直，所與遊皆當世名人。';
-  const target = document.createElement('p');
-  target.className = 'dialog-text';
-  target.textContent = targetText;
-  level.appendChild(target);
-  target.style.userSelect = 'none';
-  target.addEventListener('selectstart', (e) => e.preventDefault());
-  target.addEventListener('copy', (e) => e.preventDefault());
-  target.addEventListener('cut', (e) => e.preventDefault());
-  target.addEventListener('contextmenu', (e) => e.preventDefault());
+  const correct = [
+    '子厚，諱宗元。',
+    '七世祖慶，為拓跋魏侍中，封濟陰公。',
+    '曾伯祖奭，為唐宰相，與褚遂良、韓瑗俱得罪武后，死高宗朝。',
+    '皇考諱鎮，以事母棄太常博士，求為縣令江南。',
+    '其後以不能媚權貴，失禦史。',
+    '權貴人死，乃複拜侍御史。',
+    '號為剛直，所與遊皆當世名人。'
+  ];
+  const toText = (arr) => arr.join('');
+  let order = correct.slice();
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
 
-  const input = document.createElement('textarea');
-  input.className = 'typing-input';
-  input.rows = 6;
-  input.placeholder = '從頭開始輸入…';
-  level.appendChild(input);
-  input.addEventListener('paste', (e) => { e.preventDefault(); });
-  input.addEventListener('drop', (e) => { e.preventDefault(); });
-  input.addEventListener('contextmenu', (e) => { e.preventDefault(); });
-  input.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); return; }
-    if (e.shiftKey && e.key === 'Insert') { e.preventDefault(); return; }
-  });
+  const list = document.createElement('div');
+  list.className = 'ordering-list';
+  level.appendChild(list);
 
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
-  const submit = document.createElement('button');
-  submit.className = 'button';
-  submit.type = 'button';
-  submit.textContent = '提交';
-  actions.appendChild(submit);
+  const checkBtn = document.createElement('button');
+  checkBtn.className = 'button';
+  checkBtn.type = 'button';
+  checkBtn.textContent = '檢查答案';
+  const shuffleBtn = document.createElement('button');
+  shuffleBtn.className = 'button';
+  shuffleBtn.type = 'button';
+  shuffleBtn.textContent = '重新洗牌';
+  actions.appendChild(checkBtn);
+  actions.appendChild(shuffleBtn);
   level.appendChild(actions);
 
-  const status = document.createElement('p');
-  status.className = 'dialog-text';
-  status.textContent = `進度：0 / ${targetText.length}`;
-  level.appendChild(status);
-
   let locked = false;
-  function resetChallenge() {
-    locked = false;
-    input.disabled = false;
-    input.value = '';
-    status.textContent = `進度：0 / ${targetText.length}`;
-    input.focus();
+
+  function renderList() {
+    list.innerHTML = '';
+    order.forEach((text, idx) => {
+      const row = document.createElement('div');
+      row.className = 'ordering-item';
+      const para = document.createElement('p');
+      para.className = 'dialog-text';
+      para.textContent = text;
+      const controls = document.createElement('div');
+      controls.className = 'actions';
+      const up = document.createElement('button');
+      up.className = 'button';
+      up.type = 'button';
+      up.textContent = '上移';
+      const down = document.createElement('button');
+      down.className = 'button';
+      down.type = 'button';
+      down.textContent = '下移';
+      up.addEventListener('click', () => {
+        if (locked || isGameOver || blockingModalOpen) return;
+        if (idx <= 0) { handleError('Number'); return; }
+        const tmp = order[idx - 1]; order[idx - 1] = order[idx]; order[idx] = tmp;
+        renderList();
+      });
+      down.addEventListener('click', () => {
+        if (locked || isGameOver || blockingModalOpen) return;
+        if (idx >= order.length - 1) { handleError('Number'); return; }
+        const tmp = order[idx + 1]; order[idx + 1] = order[idx]; order[idx] = tmp;
+        renderList();
+      });
+      controls.appendChild(up);
+      controls.appendChild(down);
+      row.appendChild(para);
+      row.appendChild(controls);
+      list.appendChild(row);
+    });
   }
-  window.level9Reset = resetChallenge;
 
-  input.addEventListener('input', () => {
-    if (locked || isGameOver || blockingModalOpen) return;
-    const len = input.value.length;
-    status.textContent = `進度：${len} / ${targetText.length}`;
-  });
+  function resetOrdering() {
+    locked = false;
+    order = correct.slice();
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = order[i]; order[i] = order[j]; order[j] = t;
+    }
+    renderList();
+  }
+  window.level9Reset = resetOrdering;
 
-  let composing = false;
-  input.addEventListener('compositionstart', () => { composing = true; });
-  input.addEventListener('compositionend', () => { composing = false; });
-  input.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Enter') return;
-    ev.preventDefault();
+  checkBtn.addEventListener('click', () => {
     if (locked || isGameOver || blockingModalOpen) return;
-    if (composing) return;
-    const v = input.value;
-    if (v === targetText) {
+    const ok = toText(order) === toText(correct);
+    if (ok) {
       locked = true;
-      input.disabled = true;
       showBlockModal('通關', [
         { text: '墓誌銘完成，字跡剛勁有力，韓愈表情釋然。' },
         { text: '「文成！ 你明白了文以載道的真義，在公義與私情之間劃下了最完美的句點。你的道統，無人可撼動。」' },
       ], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
     } else {
-      locked = true;
-      input.disabled = true;
       showPunishOverlay();
       handleError('Number');
     }
   });
 
-  submit.addEventListener('click', () => {
+  shuffleBtn.addEventListener('click', () => {
     if (locked || isGameOver || blockingModalOpen) return;
-    if (composing) return;
-    const v = input.value;
-    if (v === targetText) {
-      locked = true;
-      input.disabled = true;
-      showBlockModal('通關', [
-        { text: '墓誌銘完成，字跡剛勁有力，韓愈表情釋然。' },
-        { text: '「文成！ 你明白了文以載道的真義，在公義與私情之間劃下了最完美的句點。你的道統，無人可撼動。」' },
-      ], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
-    } else {
-      locked = true;
-      input.disabled = true;
-      showPunishOverlay();
-      handleError('Number');
-    }
+    resetOrdering();
   });
 
-  showConfirmModal('提示', '準備好了嗎？開始臨摹。', '開始', () => { input.focus(); });
+  renderList();
+  showConfirmModal('提示', '準備好了嗎？開始排序。', '開始');
 }
 
 function startFiveOriginalsLevel() {
@@ -3347,6 +3356,7 @@ document.addEventListener('keydown', (e) => {
 setupBgmAutoplay();
 initBgm();
 playBgm();
+document.documentElement.style.setProperty('--bg-image', "url('ice_room.jpg')");
 const globalBgmToggle = document.getElementById('globalBgmToggle');
 if (globalBgmToggle) {
   globalBgmToggle.textContent = bgmEnabled ? '♪' : '🔇';
@@ -3457,6 +3467,8 @@ function startDebugLevel() {
   if (startScreen) startScreen.style.display = 'none';
   isGameOver = false;
   systemCleanup(false);
+  try { localStorage.setItem('hanliu_player_name', '測試卡'); } catch {}
+  if (input) input.value = '測試卡';
   currentRoute = 'HanYu';
   startTime = Date.now();
   currentLevel = n;

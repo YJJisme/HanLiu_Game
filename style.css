@@ -11,7 +11,11 @@
 html, body { height: 100%; overflow: hidden; }
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: var(--fg);
   font-family: ui-serif, "Noto Serif TC", "Songti TC", "PMingLiU", serif;
   -webkit-font-smoothing: antialiased;
