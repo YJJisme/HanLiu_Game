@@ -2443,7 +2443,7 @@ function openAbout() {
   const d4 = document.createElement('p'); d4.className = 'dialog-text'; d4.textContent = '數據來源：經典文獻與韓柳文集、上課簡報';
   const d5 = document.createElement('p'); d5.className = 'dialog-text'; d5.textContent = '品質管制顧問 (QC)：楊采樺';
   const d6 = document.createElement('p'); d6.className = 'dialog-text'; d6.textContent = '專案政策顧問：鍾旻諺、李聖億';
-  const d7 = document.createElement('p'); d7.className = 'dialog-text'; d7.textContent = '版本：v1.0.1';
+  const d7 = document.createElement('p'); d7.className = 'dialog-text'; d7.textContent = `版本：${appVersion}`;
   const back = document.createElement('button');
   back.className = 'button';
   back.type = 'button';
