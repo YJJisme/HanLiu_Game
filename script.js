@@ -19,7 +19,7 @@ if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
 let appVersion = '1.0.4';
-let releaseNotes = ['測試卡暱稱顯示「測試卡」','套用冰室照片作為背景','第九關改為段落排序'];
+let releaseNotes = ['第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
 
 let matchScore = 0;
 let errorCount = 0;
@@ -277,7 +277,7 @@ function startNumberLevel(n) {
   if (n === 6) { presentLevelIntro('第六關：平定淮西', '移動滑條接住正確數字，避開錯誤與特殊項。達成目標後通關。', startHuaiXiLevel); return; }
   if (n === 7) { presentLevelIntro('第七關：諫迎佛骨', '第一段接住「佛」影響局勢；第二段以行動平衡怒氣、勸諫與朝臣支持。達成條件即通關。', startBuddhaBoneLevel); return; }
   if (n === 8) { presentLevelIntro('第八關：祭鱷魚文', '在棋盤上蛇形移動，依序吃到句子的字。撞牆或吃錯會受傷。', startCrocodileLevel); return; }
-  if (n === 9) { presentLevelIntro('第九關：為友撰銘', '輸入完整銘文並提交或按 Enter，正確即通關；錯誤會受傷。', startEpitaphLevel); return; }
+  if (n === 9) { presentLevelIntro('第九關：為友撰銘', '將七段亂序段落以「上移／下移」排成正確順序，完成即通關；錯誤會受傷。', startEpitaphLevel); return; }
   if (n === 10) { startLevel10(); return; }
   const main = document.querySelector('main.container');
   const sec = document.createElement('section');
@@ -2129,6 +2129,7 @@ function navigateHome() {
   document.documentElement.style.setProperty('--bg', '#1a1a1a');
   document.documentElement.style.setProperty('--fg', '#cfcfcf');
   document.documentElement.style.setProperty('--muted', '#9aa0a6');
+  document.documentElement.style.setProperty('--bg-image', "url('home.png')");
   if (main) { main.style.alignItems = ''; main.style.justifyItems = ''; }
   hideHpBar();
   isGameOver = false;
@@ -2136,38 +2137,32 @@ function navigateHome() {
 }
 
 function openNotice() {
-  const main = document.querySelector('main.container');
-  const start = document.getElementById('startScreen');
-  if (start) start.style.display = 'none';
-  clearMainContent(true);
-  const page = document.createElement('section');
-  page.className = 'dialog-container';
-  page.style.maxHeight = '90vh';
-  page.style.overflow = 'auto';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'modal hc3';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { document.body.removeChild(overlay); });
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '公告';
   const ver = document.createElement('p');
   ver.className = 'dialog-text';
   ver.textContent = `版本：${appVersion}`;
-  page.appendChild(title);
-  page.appendChild(ver);
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(ver);
   releaseNotes.forEach(n => {
     const p = document.createElement('p');
     p.className = 'dialog-text';
     p.textContent = `• ${n}`;
-    page.appendChild(p);
+    modal.appendChild(p);
   });
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-  const backBtn = document.createElement('button');
-  backBtn.className = 'button';
-  backBtn.type = 'button';
-  backBtn.textContent = '返回主頁';
-  backBtn.addEventListener('click', navigateHome);
-  actions.appendChild(backBtn);
-  page.appendChild(actions);
-  main.appendChild(page);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 function retryGame() {
@@ -2440,14 +2435,15 @@ function createDialogContainer(playerName) {
 }
 
 function openAbout() {
-  const main = document.querySelector('main.container');
-  const start = document.getElementById('startScreen');
-  if (start) start.style.display = 'none';
-  clearMainContent(true);
-  const page = document.createElement('section');
-  page.className = 'dialog-container';
-  page.style.maxHeight = '90vh';
-  page.style.overflow = 'auto';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'modal hc3';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { document.body.removeChild(overlay); });
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '關於遊戲';
@@ -2461,22 +2457,18 @@ function openAbout() {
   const d5 = document.createElement('p'); d5.className = 'dialog-text'; d5.textContent = '品質管制顧問 (QC)：楊采樺';
   const d6 = document.createElement('p'); d6.className = 'dialog-text'; d6.textContent = '專案政策顧問：鍾旻諺、李聖億';
   const d7 = document.createElement('p'); d7.className = 'dialog-text'; d7.textContent = `版本：${appVersion}`;
-  const back = document.createElement('button');
-  back.className = 'button';
-  back.type = 'button';
-  back.textContent = '返回首頁';
-  back.addEventListener('click', navigateHome);
-  page.appendChild(title);
-  page.appendChild(gameName);
-  page.appendChild(d1);
-  page.appendChild(d2);
-  page.appendChild(d3);
-  page.appendChild(d4);
-  page.appendChild(d5);
-  page.appendChild(d6);
-  page.appendChild(d7);
-  page.appendChild(back);
-  main.appendChild(page);
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(gameName);
+  modal.appendChild(d1);
+  modal.appendChild(d2);
+  modal.appendChild(d3);
+  modal.appendChild(d4);
+  modal.appendChild(d5);
+  modal.appendChild(d6);
+  modal.appendChild(d7);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 function openRouteDialog(route) {
@@ -3300,6 +3292,7 @@ function start() {
   startScreen.style.display = 'none';
   isGameOver = false;
   systemCleanup(false);
+  document.documentElement.style.removeProperty('--bg-image');
   resetHpBar();
   createDialogContainer(playerName);
 }
@@ -3356,7 +3349,7 @@ document.addEventListener('keydown', (e) => {
 setupBgmAutoplay();
 initBgm();
 playBgm();
-document.documentElement.style.setProperty('--bg-image', "url('ice_room.jpg')");
+document.documentElement.style.setProperty('--bg-image', "url('home.png')");
 const globalBgmToggle = document.getElementById('globalBgmToggle');
 if (globalBgmToggle) {
   globalBgmToggle.textContent = bgmEnabled ? '♪' : '🔇';
@@ -3469,6 +3462,7 @@ function startDebugLevel() {
   systemCleanup(false);
   try { localStorage.setItem('hanliu_player_name', '測試卡'); } catch {}
   if (input) input.value = '測試卡';
+  document.documentElement.style.removeProperty('--bg-image');
   currentRoute = 'HanYu';
   startTime = Date.now();
   currentLevel = n;

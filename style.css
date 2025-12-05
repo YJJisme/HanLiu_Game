@@ -538,3 +538,7 @@ body {
 }
 .dialog-container .seg-char { color: #0b1f3a !important; }
 .hint-text { color: #4a5b6b; }
+#startScreen .title { color: #ffffff; text-shadow: 0 2px 10px rgba(0,0,0,0.55); }
+#startScreen .intro { color: #f1f5f9; text-shadow: 0 2px 10px rgba(0,0,0,0.45); }
+#startScreen .input { background: rgba(0,0,0,0.5); border-color: #335; color: #ffffff; }
+#startScreen .button { background: linear-gradient(180deg, rgba(24,26,28,0.92), rgba(18,19,21,0.92)); border-color: #335; }
