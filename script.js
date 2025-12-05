@@ -2268,13 +2268,24 @@ function clearLeaderboardAll() {
   requirePassword(() => {
     const ep = getCloudEndpoint();
     const auth = getCloudAuth();
-    const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, true); };
+    const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, false); };
     if (ep) {
-      try {
-        fetch(ep, { method: 'DELETE', headers: { ...(auth ? { authorization: auth } : {}) } })
-          .then(() => { done(); })
-          .catch(() => { done(); });
-      } catch { done(); }
+      const baseHeaders = { ...(auth ? { authorization: auth } : {}) };
+      const jsonHeaders = { 'content-type': 'application/json', ...(auth ? { authorization: auth } : {}) };
+      const tryDelete = () => fetch(ep, { method: 'DELETE', headers: baseHeaders, mode: 'cors', keepalive: true });
+      const tryPostOverride = () => fetch(ep, { method: 'POST', headers: jsonHeaders, mode: 'cors', keepalive: true, body: JSON.stringify({ action: 'clear_all' }) });
+      const tryPutEmpty = () => fetch(ep, { method: 'PUT', headers: jsonHeaders, mode: 'cors', keepalive: true, body: '[]' });
+      tryDelete()
+        .then(() => { done(); })
+        .catch(() => {
+          tryPostOverride()
+            .then(() => { done(); })
+            .catch(() => {
+              tryPutEmpty()
+                .then(() => { done(); })
+                .catch(() => { done(); });
+            });
+        });
       return;
     }
     done();
