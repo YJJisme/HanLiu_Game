@@ -162,6 +162,10 @@ function hideCharacterDisplay() {
 
 function finalizeGame() {
   systemCleanup(true);
+  try {
+    Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
+    blockingModalOpen = false;
+  } catch {}
   const playerName = localStorage.getItem('hanliu_player_name') || '無名';
   currentProgress = 'Completed';
   const route = currentRoute || 'HanYu';
