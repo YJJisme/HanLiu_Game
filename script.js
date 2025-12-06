@@ -3417,6 +3417,14 @@ function start() {
   startScreen.style.display = 'none';
   isGameOver = false;
   systemCleanup(false);
+  try { Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } }); blockingModalOpen = false; } catch {}
+  matchScore = 0;
+  orderFailed = false;
+  lastRunId = null;
+  customNumberFailText = null;
+  currentLevel = 1;
+  currentLevelIndex = -1;
+  cloudSyncDisabled = false;
   document.documentElement.style.removeProperty('--bg-image');
   document.documentElement.style.removeProperty('--bg-overlay');
   document.documentElement.style.removeProperty('--bg-overlay');
