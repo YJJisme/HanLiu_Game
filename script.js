@@ -3083,6 +3083,7 @@ function showBlockModal(titleText, bodyItems, onClose) {
         const img = document.createElement('img');
         img.className = 'illustration';
         img.src = item.image;
+        img.onerror = () => { try { img.src = 'home.png'; } catch {} };
         img.alt = item.alt || '';
         modal.appendChild(img);
         if (item.text) {
@@ -3489,6 +3490,7 @@ const globalBgmToggle = document.getElementById('globalBgmToggle');
       try { saveScore('測試卡-SS預覽', demoScore, currentRoute); } catch {}
       renderLeaderboardPage('All', pv === 'ss' ? 'SS 稀有特效預覽' : `分數預覽：${demoScore}`);
       displayLeaderboard('All', true);
+      try { finalizeGame(); } catch {}
     } else if (pv === 'demo' || (Array.isArray(multi) && multi.length)) {
       cloudSyncDisabled = true;
       const sample = pv === 'demo' ? [301, 280, 220, 180, 130, 50, 0] : multi;
