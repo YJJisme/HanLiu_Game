@@ -18,8 +18,8 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.1.0';
-let releaseNotes = ['SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
+let appVersion = '1.1.1';
+let releaseNotes = ['加入結算插圖（SS/S/A/B/C/D 等級對應）','SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
 
 let matchScore = 0;
 let errorCount = 0;
