@@ -43,6 +43,7 @@ let bgmAudio = null;
 let bgmEnabled = true;
 let orderFailed = false;
 let cloudSyncDisabled = false;
+let lastRunId = null;
 
 function initBgm() {
   if (bgmAudio) return;
@@ -207,6 +208,13 @@ function finalizeGame() {
     ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
     return;
   }
+  if (rk && rk.level === 'E') {
+    saveScore(playerName, matchScore, route);
+    showBlockModal('非我族類', [
+      { image: 'han_yu_aged_dead.png', alt: '非我族類', text: rk.description }
+    ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
+    return;
+  }
   saveScore(playerName, matchScore, route);
   renderLeaderboardPage(route, '結算：本局結果如下');
 }
@@ -277,9 +285,8 @@ function handleError(levelType) {
     setTimeout(() => {
       death.remove();
       currentProgress = `Failed at Level ${currentLevel}`;
-      const playerName = localStorage.getItem('hanliu_player_name') || '無名';
-      saveScore(playerName, matchScore, currentRoute || 'HanYu');
-      renderLeaderboardPage(currentRoute || 'HanYu', '遺憾地結束了這段困頓的求仕之旅...');
+      currentRoute = currentRoute || 'HanYu';
+      finalizeGame();
       errorLock = false;
       customNumberFailText = null;
     }, 2500);
@@ -2089,6 +2096,10 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     info.className = 'dialog-text';
     info.textContent = headingText || '';
     const curRank = computeRank(matchScore, orderFailed);
+    const curIndex = list.findIndex(r => String(r && r.id || '') === String(lastRunId || ''));
+    const rankInfo = document.createElement('p');
+    rankInfo.className = 'dialog-text';
+    rankInfo.textContent = curIndex >= 0 ? `本次名次：第${curIndex + 1} 名` : '';
     if (curRank.level === 'E') {
       document.documentElement.style.setProperty('--bg', '#000000');
     }
@@ -2129,6 +2140,14 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
           row.style.borderBottom = 'none';
           row.style.animation = 'ssPulse 4.8s ease-in-out infinite';
         }
+        if (String(r && r.id || '') === String(lastRunId || '')) {
+          row.style.outline = '3px solid #64b5f6';
+          row.style.boxShadow = '0 0 0 3px rgba(100,181,246,0.35)';
+          const curBadge = document.createElement('span');
+          curBadge.className = 'route';
+          curBadge.textContent = '【本次】';
+          row.appendChild(curBadge);
+        }
         const badge = document.createElement('span');
         badge.className = 'route';
         badge.textContent = rRank ? `【${rRank.title}】` : '';
@@ -2156,6 +2175,7 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     actions.appendChild(backBtn);
     actions.appendChild(retryBtn);
     if (headingText) page.appendChild(info);
+    if (rankInfo.textContent) page.appendChild(rankInfo);
     page.appendChild(content);
     page.appendChild(actions);
     backdrop.hidden = true;
@@ -2285,6 +2305,7 @@ function saveScore(name, score, route) {
   const now = Date.now();
   const totalSeconds = startTime ? Math.max(0, Math.floor((now - startTime) / 1000)) : 0;
   const rec = { id: genRecordId(), name, score, route, time: totalSeconds, progress: currentProgress, ts: now };
+  lastRunId = rec.id;
   arr.push(rec);
   localStorage.setItem(key, JSON.stringify(dedupeRecords(arr)));
   if (!cloudSyncDisabled && getCloudEndpoint()) {
