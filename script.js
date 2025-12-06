@@ -186,6 +186,27 @@ function finalizeGame() {
     ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
     return;
   }
+  if (rk && rk.level === 'B') {
+    saveScore(playerName, matchScore, route);
+    showBlockModal('剛直名臣', [
+      { image: 'hanyu_b.png', alt: '剛直名臣', text: '你性格剛直，不畏強權。雖然在文學上的細膩度稍遜一籌，但你的一身傲骨與經世濟民的熱忱，足以立足朝堂。' }
+    ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
+    return;
+  }
+  if (rk && rk.level === 'C') {
+    saveScore(playerName, matchScore, route);
+    showBlockModal('國子監祭酒', [
+      { image: 'hanyu_c.png', alt: '國子監祭酒', text: '業精於勤荒於嬉。你對韓學有所涉獵，但尚未融會貫通。你在國子監授課，台下學生或睡或點頭。' }
+    ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
+    return;
+  }
+  if (rk && rk.level === 'D') {
+    saveScore(playerName, matchScore, route);
+    showBlockModal('時運不濟', [
+      { image: 'hanyu_d.png', alt: '落第秀才', text: '二鳥賦中歎不遇，你的才華似乎還需要時間打磨。或者，你其實更適合去隔壁棚找李白喝酒？' }
+    ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
+    return;
+  }
   saveScore(playerName, matchScore, route);
   renderLeaderboardPage(route, '結算：本局結果如下');
 }
