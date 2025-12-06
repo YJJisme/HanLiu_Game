@@ -18,8 +18,8 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.0.4';
-let releaseNotes = ['第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
+let appVersion = '1.1.0';
+let releaseNotes = ['SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
 
 let matchScore = 0;
 let errorCount = 0;
@@ -41,6 +41,8 @@ let customNumberFailText = null;
 let mismatchCounter = 0;
 let bgmAudio = null;
 let bgmEnabled = true;
+let orderFailed = false;
+let cloudSyncDisabled = false;
 
 function initBgm() {
   if (bgmAudio) return;
@@ -161,8 +163,31 @@ function finalizeGame() {
   systemCleanup(true);
   const playerName = localStorage.getItem('hanliu_player_name') || '無名';
   currentProgress = 'Completed';
-  saveScore(playerName, matchScore, currentRoute || 'HanYu');
-  renderLeaderboardPage(currentRoute || 'HanYu', '結算：本局結果如下');
+  const route = currentRoute || 'HanYu';
+  const rk = computeRank(matchScore, orderFailed);
+  if (route === 'HanYu' && rk && rk.level === 'SS') {
+    saveScore(playerName, matchScore, route);
+    showBlockModal('傳說', [
+      { image: 'hanyu_ss.png', alt: '泰山北斗', text: '唯有韓愈能超越韓愈。你立於群山之巔，視天下為筆墨，文道與山河同在。' }
+    ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
+    return;
+  }
+  if (rk && rk.level === 'S') {
+    saveScore(playerName, matchScore, route);
+    showBlockModal('百代文宗', [
+      { image: 'hanyu_s.png', alt: '百代文宗', text: '匹夫而為百世師，一言而為天下法。你的靈魂與韓昌黎完全共振，文能載道，武能平亂。' }
+    ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
+    return;
+  }
+  if (rk && rk.level === 'A') {
+    saveScore(playerName, matchScore, route);
+    showBlockModal('唐宋八大家之首', [
+      { image: 'hanyu_a.png', alt: '唐宋八大家之首', text: '文筆雄健，氣勢磅礡。雖偶有波折，但你堅持古文運動，力抗流俗。你的名字將與柳宗元並列，永載史冊。' }
+    ], () => { renderLeaderboardPage(route, '結算：本局結果如下'); });
+    return;
+  }
+  saveScore(playerName, matchScore, route);
+  renderLeaderboardPage(route, '結算：本局結果如下');
 }
 
 function handleError(levelType) {
@@ -636,7 +661,7 @@ function endP1(success) {
       }
       if (pleaPoint >= 4 && rageValue < 100 && courtOpinionValue >= 80) {
         locked = true;
-        showBlockModal('通關', [{ text: '進入潮州貶謫' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+        showBlockModal('通關', [{ text: '進入潮州貶謫' }], () => { bumpScore(25); level.style.display = 'none'; goToNextLevel(); });
       }
     }
     const a = document.createElement('button'); a.className = 'button option'; a.type = 'button'; a.textContent = '終極勸諫'; a.addEventListener('click', () => applyAction('A'));
@@ -832,7 +857,7 @@ function startCrocodileLevel() {
           currentIndex += 1;
           hintShown = false;
           lastProgressAt = performance.now();
-          if (currentIndex >= chars.length) { stopGame(); showBlockModal('通關', [{ text: '鱷魚被驅逐，江岸重歸寧靜。' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); }); return; }
+          if (currentIndex >= chars.length) { stopGame(); showBlockModal('通關', [{ text: '鱷魚被驅逐，江岸重歸寧靜。' }], () => { bumpScore(20); level.style.display = 'none'; goToNextLevel(); }); return; }
         } else { onFail(); return; }
       } else { snake.pop(); }
     }
@@ -1001,7 +1026,7 @@ function startEpitaphLevel() {
       showBlockModal('通關', [
         { text: '墓誌銘完成，字跡剛勁有力，韓愈表情釋然。' },
         { text: '「文成！ 你明白了文以載道的真義，在公義與私情之間劃下了最完美的句點。你的道統，無人可撼動。」' },
-      ], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+      ], () => { bumpScore(20); level.style.display = 'none'; goToNextLevel(); });
     } else {
       showPunishOverlay();
       handleError('Number');
@@ -1090,7 +1115,7 @@ function startFiveOriginalsLevel() {
         const b = state.open[1];
         const ok = a.dataset.key === b.dataset.key && a.dataset.type !== b.dataset.type;
         if (ok) {
-          bumpScore(10);
+          bumpScore(3);
           setTimeout(() => {
             a.classList.add('matched');
             b.classList.add('matched');
@@ -1220,7 +1245,7 @@ function startPoetryLevel() {
       btn.addEventListener('click', () => {
         const ok = t === q1Poem.title;
         if (ok) {
-          bumpScore(10);
+          bumpScore(5);
           renderQ2();
         } else {
           handleError('Number');
@@ -1259,8 +1284,10 @@ function startPoetryLevel() {
       btn.addEventListener('click', () => {
         const ok = line === clauses[picked].text;
         if (ok) {
-          bumpScore(10);
-          showBlockModal('通關', [{ text: '文成！韓愈與孟郊月下推敲，將一起開創盛唐之後的另一番氣象。' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+          bumpScore(5);
+          showBlockModal('通關', [
+            { image: 'mengjiao_moon.png', alt: '韓愈與孟郊月下推敲', text: '文成！韓愈與孟郊月下推敲，將一起開創盛唐之後的另一番氣象。' }
+          ], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
         } else {
           handleError('Number');
           if (errorCount === 1) {
@@ -1380,7 +1407,7 @@ function startHuaiXiLevel() {
             } else {
               showBlockModal('提示', [{ text: '目標已捕獲！' }], () => {
                 trackedSetTimeout(() => {
-                  showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+                  showBlockModal('通關', [{ text: '韓愈獲授刑部侍郎官服，功成名就！' }], () => { bumpScore(20); level.style.display = 'none'; goToNextLevel(); });
                 }, 700);
               });
             }
@@ -1708,7 +1735,7 @@ function startReviewLevel() {
     const actual = Array.from(list.children).map(el => el.firstChild.nodeValue.trim());
     const ok = actual.length === expected.length && actual.every((x, i) => x === expected[i]);
     if (ok) {
-      bumpScore(20);
+      bumpScore(30);
       const elapsedSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : Number.MAX_SAFE_INTEGER;
       const fastRoute = elapsedSec <= 600;
       if (fastRoute) {
@@ -1721,6 +1748,7 @@ function startReviewLevel() {
       if (prev > 0) bumpScore(-prev);
       const elapsedSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : Number.MAX_SAFE_INTEGER;
       const fastRoute = elapsedSec <= 600;
+      orderFailed = true;
       if (fastRoute) {
         showBlockModal('白活了', [{ text: `順序錯誤，所有分數歸零（-${prev} 分）。但你在十分鐘內抵達，進入迴光返照關。` }], () => { sec.style.display = 'none'; startRevivalLevel(); });
       } else {
@@ -1879,6 +1907,7 @@ function startLevel10() {
   const ctx = canvas.getContext('2d'); 
   
   let frames = 0, score = 0, isRunning = false; 
+  let levelStartMs = 0; const FALL_DELAY_MS = 1200;
   const targetScore = 10; 
   const PIPE_SPAWN_INTERVAL = 150, FIRST_PIPE_DELAY = 120;   
 
@@ -1889,10 +1918,16 @@ function startLevel10() {
           ctx.fillRect(this.x, this.y, this.width, this.height); 
       }, 
       update: function() { 
-          this.velocity += this.gravity; 
+          const elapsed = performance.now() - levelStartMs; 
+          if (elapsed >= FALL_DELAY_MS) this.velocity += this.gravity; 
           this.y += this.velocity; 
-          if(this.y + this.height > canvas.height || this.y < 0) { 
+          if (elapsed >= FALL_DELAY_MS) { 
+            if (this.y + this.height > canvas.height || this.y < 0) { 
               levelFailed(); 
+            } 
+          } else { 
+            if (this.y < 0) { this.y = 0; this.velocity = 0; } 
+            if (this.y + this.height > canvas.height) { this.y = canvas.height - this.height; this.velocity = 0; } 
           } 
       } 
   }; 
@@ -1973,6 +2008,7 @@ function startLevel10() {
   function levelRetry() {
     if (isRunning) return;
     resetGameVars();
+    levelStartMs = performance.now();
     isRunning = true;
     loop();
   }
@@ -1981,7 +2017,7 @@ function startLevel10() {
     isRunning = false;
     cancelAnimationFrame(animationFrameId);
     document.getElementById('win-screen').classList.remove('hidden');
-    document.getElementById('win-btn').onclick = () => { bumpScore(10); goToNextLevel(); };
+    document.getElementById('win-btn').onclick = () => { bumpScore(20); goToNextLevel(); };
   }
   
   function startGame() {
@@ -2006,7 +2042,17 @@ function startLevel10() {
     }
   });
 
-  window.level10Reset = levelRetry;
+window.level10Reset = levelRetry;
+}
+function computeRank(score, failedOrder) {
+  const s = Number(score || 0);
+  if (s > 300) return { level: 'SS', title: '泰山北斗', description: '【傳說級成就】文起八代之衰，道濟天下之溺。蘇軾讚你：「如長江大河，渾浩流轉...泰山北斗」。你的光芒已超越時代，成為千古傳頌的神話！' };
+  if (s >= 240 && s <= 299) return { level: 'S', title: '百代文宗', description: '「匹夫而為百世師，一言而為天下法。你的靈魂與韓昌黎完全共振，文能載道，武能平亂，你是大唐夜空中最亮的那顆星！」' };
+  if (s >= 200 && s <= 239) return { level: 'A', title: '唐宋八大家之首', description: '「文筆雄健，氣勢磅礡。雖偶有波折，但你堅持古文運動，力抗流俗。你的名字將與柳宗元並列，永載史冊。」' };
+  if (s >= 160 && s <= 199) return { level: 'B', title: '刑部侍郎', description: '「你性格剛直，不畏強權。雖然在文學上的細膩度稍遜一籌，但你的一身傲骨與經世濟民的熱忱，足以立足朝堂。」' };
+  if (s >= 100 && s <= 159) return { level: 'C', title: '國子先生', description: '「業精於勤荒於嬉。你對韓學有所涉獵，但尚未融會貫通。或許是被長安的花迷了眼，亦或是被貶謫的寒風凍傷了筆觸？」' };
+  if (s >= 1 && s <= 99) return { level: 'D', title: '時運不濟', description: '「二鳥賦中歎不遇，你的才華似乎還需要時間打磨。或者，你其實更適合去隔壁棚找李白喝酒？」' };
+  return failedOrder ? { level: 'E', title: '非我族類', description: '「你的人生順序錯亂，記憶拼湊不出完整的韓愈。歷史的長河中，查無此人。」' } : { level: 'E', title: '非我族類', description: '「你的人生順序錯亂，記憶拼湊不出完整的韓愈。歷史的長河中，查無此人。」' };
 }
 function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
   clearMainContent(true);
@@ -2028,14 +2074,20 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     const page = document.createElement('section');
     page.className = 'dialog-container';
     page.id = 'leaderboardPage';
-    const title = document.createElement('h2');
-    title.className = 'modal-title';
-    title.textContent = '排行榜';
+    
     const info = document.createElement('p');
     info.className = 'dialog-text';
     info.textContent = headingText || '';
+    const curRank = computeRank(matchScore, orderFailed);
+    if (curRank.level === 'E') {
+      document.documentElement.style.setProperty('--bg', '#000000');
+    }
     const content = document.createElement('div');
     content.className = 'leaderboard-content';
+    const hasSS = list.some(r => {
+      const rr = computeRank(Number(r.score || 0), false);
+      return rr && rr.level === 'SS';
+    });
     if (list.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'dialog-text';
@@ -2060,11 +2112,22 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
         const route = document.createElement('span');
         route.className = 'route';
         route.textContent = r.route === 'HanYu' ? '韓愈線' : (r.route === 'LiuZongyuan' ? '柳宗元線' : r.route);
+        const rRank = computeRank(Number(r.score || 0), false);
+        if (rRank && rRank.level === 'SS') {
+          row.classList.add('rank-ss');
+          row.style.background = 'linear-gradient(90deg, #ffd54f, #ffb74d)';
+          row.style.borderBottom = 'none';
+          row.style.animation = 'ssPulse 4.8s ease-in-out infinite';
+        }
+        const badge = document.createElement('span');
+        badge.className = 'route';
+        badge.textContent = rRank ? `【${rRank.title}】` : '';
         row.appendChild(name);
         row.appendChild(score);
         row.appendChild(time);
         row.appendChild(progress);
         row.appendChild(route);
+        if (badge.textContent) row.appendChild(badge);
         content.appendChild(row);
       });
     }
@@ -2082,7 +2145,6 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     retryBtn.addEventListener('click', retryGame);
     actions.appendChild(backBtn);
     actions.appendChild(retryBtn);
-    page.appendChild(title);
     if (headingText) page.appendChild(info);
     page.appendChild(content);
     page.appendChild(actions);
@@ -2090,7 +2152,7 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     main.appendChild(page);
     page.scrollTop = 0;
   };
-  if (!skipRemote && getCloudEndpoint()) {
+  if (!skipRemote && !cloudSyncDisabled && getCloudEndpoint()) {
     try {
       fetch(getCloudEndpoint(), { headers: { ...(getCloudAuth() ? { authorization: getCloudAuth() } : {}) } })
         .then(r => r.json())
@@ -2130,6 +2192,7 @@ function navigateHome() {
   document.documentElement.style.setProperty('--fg', '#cfcfcf');
   document.documentElement.style.setProperty('--muted', '#9aa0a6');
   document.documentElement.style.setProperty('--bg-image', "url('home.png')");
+  document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
   if (main) { main.style.alignItems = ''; main.style.justifyItems = ''; }
   hideHpBar();
   isGameOver = false;
@@ -2214,7 +2277,7 @@ function saveScore(name, score, route) {
   const rec = { id: genRecordId(), name, score, route, time: totalSeconds, progress: currentProgress, ts: now };
   arr.push(rec);
   localStorage.setItem(key, JSON.stringify(dedupeRecords(arr)));
-  if (getCloudEndpoint()) {
+  if (!cloudSyncDisabled && getCloudEndpoint()) {
     try {
       fetch(getCloudEndpoint(), {
         method: 'POST',
@@ -2256,6 +2319,10 @@ function displayLeaderboard(filterRoute, skipRemote) {
   const content = document.getElementById('leaderboardContent');
   if (content) {
     content.innerHTML = '';
+    const hasSS = list.some(r => {
+      const rr = computeRank(Number(r.score || 0), false);
+      return rr && rr.level === 'SS';
+    });
     if (list.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'dialog-text';
@@ -2280,11 +2347,17 @@ function displayLeaderboard(filterRoute, skipRemote) {
         const route = document.createElement('span');
         route.className = 'route';
         route.textContent = r.route === 'HanYu' ? '韓愈線' : (r.route === 'LiuZongyuan' ? '柳宗元線' : r.route);
+        const rRank = computeRank(Number(r.score || 0), false);
+        if (rRank && rRank.level === 'SS') row.classList.add('rank-ss');
+        const badge = document.createElement('span');
+        badge.className = 'route';
+        badge.textContent = rRank ? `【${rRank.title}】` : '';
         row.appendChild(name);
         row.appendChild(score);
         row.appendChild(time);
         row.appendChild(progress);
         row.appendChild(route);
+        if (badge.textContent) row.appendChild(badge);
         content.appendChild(row);
       });
     }
@@ -2306,6 +2379,7 @@ function clearLeaderboard() {
   });
 }
 async function wipeCloudScores() {
+  if (cloudSyncDisabled) return;
   const ep = getCloudEndpoint();
   const auth = getCloudAuth();
   if (!ep) return;
@@ -2337,6 +2411,7 @@ async function wipeCloudScores() {
 function clearLeaderboardAll() {
   requirePassword(() => {
     const done = () => { try { localStorage.removeItem('hanliu_scores'); } catch {} displayLeaderboard(leaderboardFilter, true); };
+    if (cloudSyncDisabled) { done(); return; }
     wipeCloudScores().then(() => { done(); }).catch(() => { done(); });
   });
 }
@@ -2814,7 +2889,7 @@ function renderExamAttempt() {
         final.className = 'dialog-text success-text';
         final.textContent = '貞元八年（792年），你終於中進士了！';
         level.appendChild(final);
-        bumpScore(10);
+        bumpScore(15);
         setTimeout(() => { level.style.display = 'none'; goToNextLevel(); }, 1800);
       }
     };
@@ -3256,7 +3331,7 @@ function startLetterMazeLevel() {
           }
           cell.textContent = '🚶';
           playerPos = idx;
-          showBlockModal('通關', [{ image: 'Mansion.png', alt: '宰相公府大門', text: finalGoal.feedback }], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+          showBlockModal('通關', [{ image: 'Mansion.png', alt: '宰相公府大門', text: finalGoal.feedback }], () => { bumpScore(15); level.style.display = 'none'; goToNextLevel(); });
           return;
         }
       });
@@ -3307,6 +3382,8 @@ function start() {
   isGameOver = false;
   systemCleanup(false);
   document.documentElement.style.removeProperty('--bg-image');
+  document.documentElement.style.removeProperty('--bg-overlay');
+  document.documentElement.style.removeProperty('--bg-overlay');
   resetHpBar();
   createDialogContainer(playerName);
 }
@@ -3364,19 +3441,47 @@ setupBgmAutoplay();
 initBgm();
 playBgm();
 document.documentElement.style.setProperty('--bg-image', "url('home.png')");
+document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
 const globalBgmToggle = document.getElementById('globalBgmToggle');
-if (globalBgmToggle) {
-  globalBgmToggle.textContent = bgmEnabled ? '♪' : '🔇';
-  globalBgmToggle.addEventListener('click', toggleBgm);
-}
-// 自動從網址參數寫入雲端設定（避免每台裝置手動輸入）。
-try {
-  const sp = new URLSearchParams(location.search);
-  const ep = sp.get('cloud_endpoint');
-  const au = sp.get('cloud_auth');
-  if (ep) localStorage.setItem('hanliu_cloud_endpoint', ep);
-  if (au) localStorage.setItem('hanliu_cloud_auth', au);
-} catch {}
+  if (globalBgmToggle) {
+    globalBgmToggle.textContent = bgmEnabled ? '♪' : '🔇';
+    globalBgmToggle.addEventListener('click', toggleBgm);
+  }
+  // 自動從網址參數寫入雲端設定（避免每台裝置手動輸入）。
+  try {
+    const sp = new URLSearchParams(location.search);
+    const ep = sp.get('cloud_endpoint');
+    const au = sp.get('cloud_auth');
+    if (ep) localStorage.setItem('hanliu_cloud_endpoint', ep);
+    if (au) localStorage.setItem('hanliu_cloud_auth', au);
+    const pv = (sp.get('preview') || '').toLowerCase();
+    const sc = parseInt(sp.get('score') || '', 10);
+    const multi = (sp.get('scores') || '').split(',').map(x => parseInt(x.trim(), 10)).filter(x => !isNaN(x));
+    if (pv === 'ss' || (!isNaN(sc) && sc >= 0)) {
+      cloudSyncDisabled = true;
+      const demoScore = pv === 'ss' ? 301 : Math.max(0, sc);
+      matchScore = demoScore;
+      orderFailed = false;
+      currentRoute = 'HanYu';
+      currentProgress = 'Completed';
+      startTime = Date.now() - 120000;
+      try { saveScore('測試卡-SS預覽', demoScore, currentRoute); } catch {}
+      renderLeaderboardPage('All', pv === 'ss' ? 'SS 稀有特效預覽' : `分數預覽：${demoScore}`);
+      displayLeaderboard('All', true);
+    } else if (pv === 'demo' || (Array.isArray(multi) && multi.length)) {
+      cloudSyncDisabled = true;
+      const sample = pv === 'demo' ? [301, 280, 220, 180, 130, 50, 0] : multi;
+      const baseNames = ['測試卡-SS','測試卡-S','測試卡-A','測試卡-B','測試卡-C','測試卡-D','測試卡-E'];
+      currentRoute = 'HanYu';
+      startTime = Date.now() - 180000;
+      sample.forEach((s, i) => {
+        const nm = baseNames[i] || `測試卡-${s}`;
+        try { saveScore(nm, s, currentRoute); } catch {}
+      });
+      renderLeaderboardPage('All', '預覽成績注入');
+      displayLeaderboard('All', true);
+    }
+  } catch {}
 function showHpBar() {
   const bar = document.getElementById('hpBar');
   if (bar) bar.hidden = false;
