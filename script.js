@@ -2598,6 +2598,7 @@ function navigateHome() {
   hideHpBar();
   resetGlobalState();
   systemCleanup(false);
+  applyPlayerNameInputState();
   const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
   const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = false;
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = false;
@@ -2666,6 +2667,12 @@ function openSettings() {
   const ver = document.createElement('p');
   ver.className = 'dialog-text';
   ver.textContent = `版本：${appVersion}`;
+  const nick = document.createElement('p');
+  nick.className = 'dialog-text';
+  if (isAccountBound()) {
+    const nm = getAccountName();
+    nick.textContent = `暱稱：${nm || '（未設定）'}`;
+  }
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
   const report = document.createElement('a');
@@ -2744,14 +2751,18 @@ function openSettings() {
   about.type = 'button';
   about.textContent = '關於遊戲';
   about.addEventListener('click', () => { openAbout(); });
-  actions.appendChild(report);
-  actions.appendChild(toHome);
-  actions.appendChild(restart);
+  const preLogin = isPreLogin();
+  if (!preLogin) {
+    actions.appendChild(report);
+    actions.appendChild(toHome);
+    actions.appendChild(restart);
+  }
   actions.appendChild(notice);
   actions.appendChild(about);
   modal.appendChild(close);
   modal.appendChild(title);
   modal.appendChild(ver);
+  if (isAccountBound()) modal.appendChild(nick);
   modal.appendChild(volWrap);
   volWrap.appendChild(volLabel);
   volWrap.appendChild(volSlider);
@@ -4387,3 +4398,96 @@ function resetGlobalState() {
   isGameOver = false;
   mismatchCounter = 0;
 }
+
+function isAccountBound() {
+  try { const n = localStorage.getItem('hanliu_account_name'); return !!(n && String(n).trim()); } catch { return false; }
+}
+function getAccountName() {
+  try { return String(localStorage.getItem('hanliu_account_name') || '').trim(); } catch { return ''; }
+}
+function applyPlayerNameInputState() {
+  const el = document.getElementById('playerName');
+  if (!el) return;
+  if (isAccountBound()) {
+    const name = getAccountName() || String(localStorage.getItem('hanliu_player_name') || '').trim();
+    if (name) el.value = name;
+    el.readOnly = true;
+    el.disabled = true;
+  } else {
+    el.readOnly = false;
+    el.disabled = false;
+    if (!el.value) el.placeholder = '輸入名字';
+  }
+}
+
+function isPreLogin() {
+  const gate = document.getElementById('authGate') || document.getElementById('authGateActions');
+  const start = document.getElementById('startScreen');
+  const gateVisible = !!(gate && gate.style.display !== 'none');
+  const startVisible = !!(start && start.style.display !== 'none');
+  return gateVisible || startVisible;
+}
+
+function openAuthGate() {
+  const main = document.querySelector('main.container');
+  if (!main) return;
+  const startScreen = document.getElementById('startScreen');
+  if (startScreen) startScreen.style.display = 'none';
+  const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
+  const hv = document.getElementById('homeVolume'); if (hv) hv.hidden = true;
+  const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
+  clearMainContent(true);
+  document.documentElement.style.setProperty('--bg-image', 'url("hanliu_auth_bg.png")');
+  document.documentElement.style.setProperty('--bg-overlay', 'none');
+  const sbtnShow = document.getElementById('settingsBtn');
+  if (sbtnShow) sbtnShow.hidden = false;
+  const fbBtn = document.getElementById('feedback-btn');
+  if (fbBtn) { try { document.body.removeChild(fbBtn); } catch {} }
+  const oldSec = document.getElementById('authGate');
+  if (oldSec) { try { main.removeChild(oldSec); } catch {} }
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  actions.id = 'authGateActions';
+  actions.style.display = 'flex';
+  actions.style.justifyContent = 'center';
+  actions.style.gap = '0.75rem';
+  actions.style.position = 'fixed';
+  actions.style.left = '50%';
+  actions.style.transform = 'translateX(-50%)';
+  actions.style.bottom = '12vh';
+  actions.style.flexWrap = 'wrap';
+  const applyAuthGateLayout = () => {
+    const narrow = window.innerWidth < 560;
+    actions.style.flexDirection = narrow ? 'column' : 'row';
+  };
+  applyAuthGateLayout();
+  window.addEventListener('resize', applyAuthGateLayout);
+  const accountBtn = document.createElement('button');
+  accountBtn.className = 'button';
+  accountBtn.type = 'button';
+  accountBtn.textContent = '註冊 / 登入';
+  accountBtn.addEventListener('click', () => {
+    showBlockModal('功能開發中', [ { text: '帳號登入 / 註冊尚未開放' } ]);
+  });
+  const guestBtn = document.createElement('button');
+  guestBtn.className = 'button';
+  guestBtn.type = 'button';
+  guestBtn.textContent = '以遊客進入';
+  guestBtn.addEventListener('click', () => {
+    document.documentElement.style.setProperty('--bg-image', "url('home.png')");
+    document.documentElement.style.setProperty('--bg-overlay', 'none');
+    const gateActions = document.getElementById('authGateActions');
+    if (gateActions) { try { main.removeChild(gateActions); } catch {} }
+    if (startScreen) startScreen.style.display = '';
+    applyPlayerNameInputState();
+    const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = false;
+    const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = false;
+    const hsv2 = document.getElementById('homeSfxVolume'); if (hsv2) hsv2.hidden = false;
+    try { input.focus(); } catch {}
+  });
+  actions.appendChild(accountBtn);
+  actions.appendChild(guestBtn);
+  main.appendChild(actions);
+}
+
+try { openAuthGate(); } catch {}
