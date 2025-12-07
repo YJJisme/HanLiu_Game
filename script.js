@@ -76,7 +76,7 @@ function initBgm() {
 function getStoredVolume() {
   try {
     const v = parseFloat(localStorage.getItem('hanliu_bgm_volume'));
-    if (!isNaN(v) && v >= 0 && v <= 1) return v;
+    if (!isNaN(v) && v >= 0 && v <= 1) return v === 0 ? 0.35 : v;
   } catch {}
   return bgmVolume;
 }
@@ -3823,7 +3823,7 @@ setupBgmAutoplay();
 initBgm();
 playBgm();
 try { sfxVolume = getStoredSfxVolume(); } catch {}
-document.addEventListener('pointerdown', () => { ensureAudioCtx(); resumeAudioCtx(); }, { once: true });
+document.addEventListener('pointerdown', () => { ensureAudioCtx(); resumeAudioCtx(); initBgm(); playBgm(); }, { once: true });
 document.documentElement.style.setProperty('--bg-image', "url('home.png')");
 document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
   // 自動從網址參數寫入雲端設定（避免每台裝置手動輸入）。
