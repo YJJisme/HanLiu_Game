@@ -19,9 +19,10 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.1.6';
-let releaseNotes = ['分離背景音量與音效音量','首頁以視窗集中調整音量','♪ 再次點擊可關閉音量視窗','音量標籤文字加粗提亮','雙滑桿位置分層不重疊','新增多種 WebAudio 音效（成功/失誤/受傷/收集/轉場）','錯誤與受傷時播放提示音','音效音量獨立保存，不影響背景音'];
+let appVersion = '1.1.7';
+let releaseNotes = ['結算頁加入分享結果按鈕','生成分享圖片（暱稱/分數/評語）','支援 Web Share；回退提供下載與複製','依評級自動匹配結算插圖'];
 let releaseHistory = {
+  '1.1.7': ['結算頁加入分享結果按鈕','生成分享圖片（暱稱/分數/評語）','支援 Web Share；回退提供下載與複製','依評級自動匹配結算插圖'],
   '1.1.6': ['分離背景音量與音效音量','首頁改為視窗集中調整音量','♪ 再次點擊可關閉音量視窗','音量標籤文字加粗提亮','雙滑桿位置分層不重疊','新增多種 WebAudio 音效（成功/失誤/受傷/收集/轉場）','錯誤與受傷時播放提示音','音效音量獨立保存'],
   '1.1.5': ['首頁♪音量滑桿淡入動畫','關於遊戲新增背景音樂：楊竣傑'],
   '1.1.4': ['設定紐開啟時隱藏並修復功能按鈕','首頁音量移至右上角並以♪顯示後展開滑桿','第九關段落文字提亮以增強辨識','修復「重來一次」與「回到首頁」動作'],
@@ -57,6 +58,7 @@ let sfxVolume = 0.6;
 let orderFailed = false;
 let cloudSyncDisabled = false;
 let lastRunId = null;
+let clickFxEnabled = true;
 
 function initBgm() {
   if (bgmAudio) return;
@@ -76,7 +78,7 @@ function initBgm() {
 function getStoredVolume() {
   try {
     const v = parseFloat(localStorage.getItem('hanliu_bgm_volume'));
-    if (!isNaN(v) && v >= 0 && v <= 1) return v === 0 ? 0.35 : v;
+    if (!isNaN(v) && v >= 0 && v <= 1) return v;
   } catch {}
   return bgmVolume;
 }
@@ -93,12 +95,29 @@ function getStoredSfxVolume() {
 function setStoredSfxVolume(v) {
   try { localStorage.setItem('hanliu_sfx_volume', String(v)); } catch {}
 }
+function getStoredClickFxEnabled() {
+  try {
+    const v = localStorage.getItem('hanliu_click_fx');
+    if (v === '0') return false;
+    if (v === '1') return true;
+  } catch {}
+  return true;
+}
+function setStoredClickFxEnabled(v) {
+  try { localStorage.setItem('hanliu_click_fx', v ? '1' : '0'); } catch {}
+}
 function ensureAudioCtx() {
   if (audioCtx) return;
   try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
 }
 function resumeAudioCtx() {
   try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch {}
+}
+function triggerShakeEffect() {
+  const el = document.body;
+  if (!el) return;
+  el.classList.add('shaking');
+  setTimeout(() => { try { el.classList.remove('shaking'); } catch {} }, 500);
 }
 function playClick() {
   if (!sfxEnabled) return;
@@ -107,7 +126,8 @@ function playClick() {
   const t = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-  const base = Math.max(0.02, Math.min(0.6, (sfxVolume || 0.6)));
+  if ((sfxVolume || 0) <= 0) return;
+  const base = Math.max(0, Math.min(1, (sfxVolume || 0)));
   gain.gain.setValueAtTime(base, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
   osc.type = 'square';
@@ -122,9 +142,10 @@ function sfxSuccess() {
   if (!sfxEnabled) return;
   ensureAudioCtx();
   if (!audioCtx) return;
+  if ((sfxVolume || 0) <= 0) return;
   const t = audioCtx.currentTime;
   const g = audioCtx.createGain();
-  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.8), t);
+  g.gain.setValueAtTime(Math.max(0, (sfxVolume || 0) * 0.8), t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
   const o1 = audioCtx.createOscillator();
   const o2 = audioCtx.createOscillator();
@@ -144,9 +165,10 @@ function sfxError() {
   if (!sfxEnabled) return;
   ensureAudioCtx();
   if (!audioCtx) return;
+  if ((sfxVolume || 0) <= 0) return;
   const t = audioCtx.currentTime;
   const g = audioCtx.createGain();
-  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.7), t);
+  g.gain.setValueAtTime(Math.max(0, (sfxVolume || 0) * 0.7), t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
   const o = audioCtx.createOscillator();
   o.type = 'sawtooth';
@@ -162,9 +184,10 @@ function sfxCoin() {
   if (!sfxEnabled) return;
   ensureAudioCtx();
   if (!audioCtx) return;
+  if ((sfxVolume || 0) <= 0) return;
   const t = audioCtx.currentTime;
   const g = audioCtx.createGain();
-  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6)), t);
+  g.gain.setValueAtTime(Math.max(0, (sfxVolume || 0)), t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
   const o = audioCtx.createOscillator();
   o.type = 'square';
@@ -180,6 +203,7 @@ function sfxDamage() {
   if (!sfxEnabled) return;
   ensureAudioCtx();
   if (!audioCtx) return;
+  if ((sfxVolume || 0) <= 0) return;
   const t = audioCtx.currentTime;
   const len = Math.floor(audioCtx.sampleRate * 0.18);
   const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
@@ -192,7 +216,7 @@ function sfxDamage() {
   bp.frequency.setValueAtTime(400, t);
   bp.Q.setValueAtTime(8, t);
   const g = audioCtx.createGain();
-  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.8), t);
+  g.gain.setValueAtTime(Math.max(0, (sfxVolume || 0) * 0.8), t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
   src.connect(bp);
   bp.connect(g);
@@ -204,6 +228,7 @@ function sfxWhoosh() {
   if (!sfxEnabled) return;
   ensureAudioCtx();
   if (!audioCtx) return;
+  if ((sfxVolume || 0) <= 0) return;
   const t = audioCtx.currentTime;
   const len = Math.floor(audioCtx.sampleRate * 0.35);
   const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
@@ -216,7 +241,7 @@ function sfxWhoosh() {
   lp.frequency.setValueAtTime(600, t);
   lp.frequency.linearRampToValueAtTime(2200, t + 0.32);
   const g = audioCtx.createGain();
-  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.6), t);
+  g.gain.setValueAtTime(Math.max(0, (sfxVolume || 0) * 0.6), t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
   src.connect(lp);
   lp.connect(g);
@@ -427,9 +452,10 @@ function handleError(levelType) {
   if (levelType === 'Number') {
     if (errorLock) return;
     errorLock = true;
-    errorCount += 1;
-    updateHpBar();
-    try { sfxError(); sfxDamage(); } catch {}
+  errorCount += 1;
+  updateHpBar();
+  try { sfxError(); sfxDamage(); } catch {}
+  try { triggerShakeEffect(); } catch {}
   if (errorCount === 1) {
     showPunishOverlay();
     setTimeout(() => {
@@ -443,8 +469,9 @@ function handleError(levelType) {
     systemCleanup(true);
     clearMainContent(true);
     hideCharacterDisplay();
-    hideHpBar();
-    try { sfxDamage(); } catch {}
+  hideHpBar();
+  try { sfxDamage(); } catch {}
+  try { triggerShakeEffect(); } catch {}
     if (currentLevel === 8) {
       const overlay = document.createElement('div');
       overlay.className = 'punish-overlay';
@@ -2264,6 +2291,151 @@ function computeRank(score, failedOrder) {
   if (s >= 1 && s <= 99) return { level: 'D', title: '時運不濟', description: '「二鳥賦中歎不遇，你的才華似乎還需要時間打磨。或者，你其實更適合去隔壁棚找李白喝酒？」' };
   return failedOrder ? { level: 'E', title: '非我族類', description: '「你的人生順序錯亂，記憶拼湊不出完整的韓愈。歷史的長河中，查無此人。」' } : { level: 'E', title: '非我族類', description: '「你的人生順序錯亂，記憶拼湊不出完整的韓愈。歷史的長河中，查無此人。」' };
 }
+
+function getRankImagePath(level) {
+  if (level === 'SS') return 'hanyu_ss.png';
+  if (level === 'S') return 'hanyu_s.png';
+  if (level === 'A') return 'hanyu_a.png';
+  if (level === 'B') return 'hanyu_b.png';
+  if (level === 'C') return 'hanyu_c.png';
+  if (level === 'D') return 'hanyu_d.png';
+  return 'han_yu_aged_dead.png';
+}
+
+function buildShareText(name, score, rk) {
+  const lines = [];
+  lines.push(`玩家：${name}`);
+  lines.push(`分數：${score}`);
+  lines.push(`評級：${rk.title}（${rk.level}）`);
+  if (rk.description) lines.push(`評語：${rk.description}`);
+  return lines.join('\n');
+}
+
+function showShareModal(previewUrl, text, onDownload, onCopy) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '分享結果';
+  const img = document.createElement('img');
+  img.className = 'illustration';
+  img.src = previewUrl;
+  img.alt = '分享預覽';
+  const p = document.createElement('p');
+  p.className = 'dialog-text';
+  p.textContent = text;
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const dl = document.createElement('button');
+  dl.className = 'button';
+  dl.type = 'button';
+  dl.textContent = '下載圖片';
+  dl.addEventListener('click', () => { try { onDownload(); } catch {} });
+  const cp = document.createElement('button');
+  cp.className = 'button';
+  cp.type = 'button';
+  cp.textContent = '複製文字';
+  cp.addEventListener('click', () => { try { onCopy(); } catch {} });
+  actions.appendChild(dl);
+  actions.appendChild(cp);
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(img);
+  modal.appendChild(p);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+async function shareGameResult() {
+  const name = localStorage.getItem('hanliu_player_name') || '無名';
+  const score = Number(matchScore || 0);
+  const rk = computeRank(score, orderFailed);
+  const imgSrc = getRankImagePath(rk.level);
+  const img = new Image();
+  const canvas = document.createElement('canvas');
+  const w = 720, h = 1080;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const draw = () => {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#1a1a1a');
+    grad.addColorStop(1, '#0f0f0f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    const pad = 24;
+    let ih = Math.floor(h * 0.42);
+    let iw = Math.floor(ih * (4/3));
+    const x = Math.floor((w - iw) / 2);
+    const y = pad;
+    try { ctx.drawImage(img, x, y, iw, ih); } catch {}
+    ctx.fillStyle = '#f7fbff';
+    ctx.font = 'bold 36px system-ui, Arial';
+    ctx.textBaseline = 'top';
+    const title = '寒流｜遊玩結果';
+    ctx.fillText(title, pad, ih + y + 12);
+    ctx.font = 'bold 30px system-ui, Arial';
+    ctx.fillText(`玩家：${name}`, pad, ih + y + 64);
+    ctx.fillText(`分數：${score}`, pad, ih + y + 106);
+    ctx.fillText(`評級：${rk.title}（${rk.level}）`, pad, ih + y + 148);
+    ctx.font = '24px system-ui, Arial';
+    const comment = rk.description || '';
+    const maxWidth = w - pad * 2;
+    const lines = [];
+    let rest = comment;
+    while (rest.length) {
+      let len = Math.min(28, rest.length);
+      let seg = rest.slice(0, len);
+      while (ctx.measureText(seg).width > maxWidth && len > 8) { len -= 1; seg = rest.slice(0, len); }
+      lines.push(seg);
+      rest = rest.slice(seg.length);
+    }
+    let ty = ih + y + 196;
+    lines.forEach((ln) => { ctx.fillText(ln, pad, ty); ty += 34; });
+    ctx.fillStyle = '#9aa0a6';
+    ctx.font = '20px system-ui, Arial';
+    const dt = new Date();
+    const footer = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    ctx.fillText(footer, pad, h - pad - 24);
+  };
+  const asBlob = () => new Promise((resolve) => { canvas.toBlob((b) => resolve(b), 'image/png'); });
+  await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; img.src = imgSrc; });
+  draw();
+  const blob = await asBlob();
+  const text = buildShareText(name, score, rk);
+  if (navigator.share && blob) {
+    try {
+      const file = new File([blob], `hanliu_${score}_${rk.level}.png`, { type: 'image/png' });
+      const canFiles = typeof navigator.canShare === 'function' ? navigator.canShare({ files: [file] }) : true;
+      if (canFiles) {
+        await navigator.share({ title: '寒流｜遊玩結果', text, files: [file] });
+        return;
+      }
+    } catch {}
+  }
+  const url = URL.createObjectURL(blob);
+  const doDownload = () => {
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hanliu_${score}_${rk.level}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {}
+  };
+  const doCopy = () => {
+    try { navigator.clipboard.writeText(text); } catch {}
+  };
+  showShareModal(url, text, doDownload, doCopy);
+}
 function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
   clearMainContent(true);
   hideCharacterDisplay();
@@ -2367,6 +2539,12 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     retryBtn.addEventListener('click', retryGame);
     actions.appendChild(backBtn);
     actions.appendChild(retryBtn);
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'button';
+    shareBtn.type = 'button';
+    shareBtn.textContent = '分享結果';
+    shareBtn.addEventListener('click', shareGameResult);
+    actions.appendChild(shareBtn);
     if (headingText) page.appendChild(info);
     if (rankInfo.textContent) page.appendChild(rankInfo);
     page.appendChild(content);
@@ -2527,6 +2705,14 @@ function openSettings() {
     sfxVolume = nv;
     setStoredSfxVolume(nv);
   });
+  const fxLabel = document.createElement('span');
+  fxLabel.className = 'volume-label';
+  fxLabel.textContent = '點擊特效：';
+  const fxToggle = document.createElement('input');
+  fxToggle.type = 'checkbox';
+  fxToggle.checked = getStoredClickFxEnabled();
+  clickFxEnabled = fxToggle.checked;
+  fxToggle.addEventListener('change', () => { clickFxEnabled = !!fxToggle.checked; setStoredClickFxEnabled(clickFxEnabled); });
   const toHome = document.createElement('button');
   toHome.className = 'button';
   toHome.type = 'button';
@@ -2571,6 +2757,8 @@ function openSettings() {
   volWrap.appendChild(volSlider);
   volWrap.appendChild(sfxLabel);
   volWrap.appendChild(sfxSlider);
+  volWrap.appendChild(fxLabel);
+  volWrap.appendChild(fxToggle);
   modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -3817,12 +4005,29 @@ document.addEventListener('click', (e) => {
   if (!btn) return;
   try { playClick(); } catch {}
 });
+let lastClickFxTs = 0;
+function spawnClickFx(x, y) {
+  if (!clickFxEnabled) return;
+  const now = performance.now();
+  if (now - lastClickFxTs < 60) return;
+  lastClickFxTs = now;
+  const el = document.createElement('div');
+  el.className = 'click-effect';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  document.body.appendChild(el);
+  el.addEventListener('animationend', () => { try { document.body.removeChild(el); } catch {} });
+}
+document.addEventListener('pointerdown', (e) => {
+  spawnClickFx(e.clientX, e.clientY);
+});
 const settingsBtn = document.getElementById('settingsBtn');
 if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
 setupBgmAutoplay();
 initBgm();
 playBgm();
 try { sfxVolume = getStoredSfxVolume(); } catch {}
+try { clickFxEnabled = getStoredClickFxEnabled(); } catch {}
 document.addEventListener('pointerdown', () => { ensureAudioCtx(); resumeAudioCtx(); initBgm(); playBgm(); }, { once: true });
 document.documentElement.style.setProperty('--bg-image', "url('home.png')");
 document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
