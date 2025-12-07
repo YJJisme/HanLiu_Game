@@ -14,12 +14,20 @@ const DEV_PASSWORD = '3637';
 let devModeEnabled = false;
 const CLOUD_SYNC_ENDPOINT = 'https://hanliu-leaderboard.50327willy50327.workers.dev/scores';
 const CLOUD_SYNC_AUTH = '';
+const FEEDBACK_URL = 'https://mail.google.com/mail/?view=cm&fs=1&to=50327willy50327@gmail.com&su=%E3%80%90%E5%AF%92%E6%B5%81%E3%80%91%E9%81%8A%E6%88%B2%E5%9B%9E%E5%A0%B1%E8%88%87%E5%BB%BA%E8%AD%B0';
 const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.1.1';
-let releaseNotes = ['加入結算插圖（SS/S/A/B/C/D 等級對應）','SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
+let appVersion = '1.1.5';
+let releaseNotes = ['第九關 UI 直覺化：拖曳排序與即時預覽','設定面板新增音量滑桿；整合回報/首頁/重來/公告','移除下方固定回報按鈕以免遮擋','加入結算插圖（SS/S/A/B/C/D 等級對應）','SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
+let releaseHistory = {
+  '1.1.5': ['首頁♪音量滑桿淡入動畫','關於遊戲新增背景音樂：楊竣傑'],
+  '1.1.4': ['設定紐開啟時隱藏並修復功能按鈕','首頁音量移至右上角並以♪顯示後展開滑桿','第九關段落文字提亮以增強辨識','修復「重來一次」與「回到首頁」動作'],
+  '1.1.3': ['第九關 UI 直覺化：拖曳排序與即時預覽'],
+  '1.1.2': ['設定面板新增音量滑桿；整合回報/首頁/重來/公告','移除下方固定回報按鈕以免遮擋'],
+  '1.1.1': ['加入結算插圖（SS/S/A/B/C/D 等級對應）','SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景']
+};
 
 let matchScore = 0;
 let errorCount = 0;
@@ -41,6 +49,7 @@ let customNumberFailText = null;
 let mismatchCounter = 0;
 let bgmAudio = null;
 let bgmEnabled = true;
+let bgmVolume = 0.35;
 let orderFailed = false;
 let cloudSyncDisabled = false;
 let lastRunId = null;
@@ -50,7 +59,18 @@ function initBgm() {
   bgmAudio = new Audio('music1.mp3');
   bgmAudio.loop = true;
   bgmAudio.preload = 'auto';
-  bgmAudio.volume = 0.35;
+  bgmVolume = getStoredVolume();
+  bgmAudio.volume = bgmVolume;
+}
+function getStoredVolume() {
+  try {
+    const v = parseFloat(localStorage.getItem('hanliu_bgm_volume'));
+    if (!isNaN(v) && v >= 0 && v <= 1) return v;
+  } catch {}
+  return bgmVolume;
+}
+function setStoredVolume(v) {
+  try { localStorage.setItem('hanliu_bgm_volume', String(v)); } catch {}
 }
 
 function playBgm() {
@@ -69,8 +89,6 @@ function toggleBgm() {
   if (bgmEnabled) playBgm(); else pauseBgm();
   const btn = document.getElementById('bgmToggle');
   if (btn) btn.textContent = bgmEnabled ? '♪' : '🔇';
-  const gbtn = document.getElementById('globalBgmToggle');
-  if (gbtn) gbtn.textContent = bgmEnabled ? '♪' : '🔇';
 }
 
 function setupBgmAutoplay() {
@@ -334,7 +352,7 @@ function startNumberLevel(n) {
   if (n === 6) { presentLevelIntro('第六關：平定淮西', '移動滑條接住正確數字，避開錯誤與特殊項。達成目標後通關。', startHuaiXiLevel); return; }
   if (n === 7) { presentLevelIntro('第七關：諫迎佛骨', '第一段接住「佛」影響局勢；第二段以行動平衡怒氣、勸諫與朝臣支持。達成條件即通關。', startBuddhaBoneLevel); return; }
   if (n === 8) { presentLevelIntro('第八關：祭鱷魚文', '在棋盤上蛇形移動，依序吃到句子的字。撞牆或吃錯會受傷。', startCrocodileLevel); return; }
-  if (n === 9) { presentLevelIntro('第九關：為友撰銘', '將七段亂序段落以「上移／下移」排成正確順序，完成即通關；錯誤會受傷。', startEpitaphLevel); return; }
+  if (n === 9) { presentLevelIntro('第九關：為友撰銘', '拖曳七段亂序段落排成正確順序，完成即通關；錯誤會受傷。', startEpitaphLevel); return; }
   if (n === 10) { startLevel10(); return; }
   const main = document.querySelector('main.container');
   const sec = document.createElement('section');
@@ -962,7 +980,7 @@ function startEpitaphLevel() {
 
   const intro = document.createElement('p');
   intro.className = 'dialog-text';
-  intro.textContent = '請將段落排序成完整文章：';
+  intro.textContent = '拖曳排序成完整文章：';
   level.appendChild(intro);
 
   const correct = [
@@ -984,57 +1002,55 @@ function startEpitaphLevel() {
   const list = document.createElement('div');
   list.className = 'ordering-list';
   level.appendChild(list);
+  const preview = document.createElement('div');
+  preview.className = 'order-preview';
+  level.appendChild(preview);
 
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
   const checkBtn = document.createElement('button');
   checkBtn.className = 'button';
   checkBtn.type = 'button';
-  checkBtn.textContent = '檢查答案';
+  checkBtn.textContent = '提交排序';
   const shuffleBtn = document.createElement('button');
   shuffleBtn.className = 'button';
   shuffleBtn.type = 'button';
-  shuffleBtn.textContent = '重新洗牌';
+  shuffleBtn.textContent = '隨機重排';
   actions.appendChild(checkBtn);
   actions.appendChild(shuffleBtn);
   level.appendChild(actions);
 
   let locked = false;
+  let draggedIndex = -1;
 
   function renderList() {
     list.innerHTML = '';
     order.forEach((text, idx) => {
       const row = document.createElement('div');
       row.className = 'ordering-item';
+      row.draggable = true;
+      const idxBadge = document.createElement('span');
+      idxBadge.className = 'order-index';
+      idxBadge.textContent = String(idx + 1);
       const para = document.createElement('p');
       para.className = 'dialog-text';
       para.textContent = text;
-      const controls = document.createElement('div');
-      controls.className = 'actions';
-      const up = document.createElement('button');
-      up.className = 'button';
-      up.type = 'button';
-      up.textContent = '上移';
-      const down = document.createElement('button');
-      down.className = 'button';
-      down.type = 'button';
-      down.textContent = '下移';
-      up.addEventListener('click', () => {
-        if (locked || isGameOver || blockingModalOpen) return;
-        if (idx <= 0) { handleError('Number'); return; }
-        const tmp = order[idx - 1]; order[idx - 1] = order[idx]; order[idx] = tmp;
-        renderList();
-      });
-      down.addEventListener('click', () => {
-        if (locked || isGameOver || blockingModalOpen) return;
-        if (idx >= order.length - 1) { handleError('Number'); return; }
-        const tmp = order[idx + 1]; order[idx + 1] = order[idx]; order[idx] = tmp;
-        renderList();
-      });
-      controls.appendChild(up);
-      controls.appendChild(down);
+      row.appendChild(idxBadge);
       row.appendChild(para);
-      row.appendChild(controls);
+      row.addEventListener('dragstart', () => { draggedIndex = idx; });
+      row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('drag-over'); });
+      row.addEventListener('dragleave', () => { row.classList.remove('drag-over'); });
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        row.classList.remove('drag-over');
+        if (locked || isGameOver || blockingModalOpen) return;
+        if (draggedIndex === idx || draggedIndex < 0) return;
+        const item = order.splice(draggedIndex, 1)[0];
+        order.splice(idx, 0, item);
+        draggedIndex = -1;
+        renderList();
+        updatePreview();
+      });
       list.appendChild(row);
     });
   }
@@ -1047,8 +1063,13 @@ function startEpitaphLevel() {
       const t = order[i]; order[i] = order[j]; order[j] = t;
     }
     renderList();
+    updatePreview();
   }
   window.level9Reset = resetOrdering;
+
+  function updatePreview() {
+    preview.textContent = order.join('');
+  }
 
   checkBtn.addEventListener('click', () => {
     if (locked || isGameOver || blockingModalOpen) return;
@@ -1071,7 +1092,8 @@ function startEpitaphLevel() {
   });
 
   renderList();
-  showConfirmModal('提示', '準備好了嗎？開始排序。', '開始');
+  updatePreview();
+  showConfirmModal('提示', '準備好了嗎？拖曳開始排序。', '開始');
 }
 
 function startFiveOriginalsLevel() {
@@ -2229,8 +2251,12 @@ function navigateHome() {
   document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
   if (main) { main.style.alignItems = ''; main.style.justifyItems = ''; }
   hideHpBar();
-  isGameOver = false;
+  resetGlobalState();
   systemCleanup(false);
+  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
+  const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = false;
+  const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = false;
+  const hv = document.getElementById('homeVolume'); if (hv) { hv.classList.remove('is-visible'); hv.hidden = true; hv.value = String(Math.round((getStoredVolume() || 0.35) * 100)); }
 }
 
 function openNotice() {
@@ -2252,14 +2278,119 @@ function openNotice() {
   modal.appendChild(close);
   modal.appendChild(title);
   modal.appendChild(ver);
-  releaseNotes.forEach(n => {
-    const p = document.createElement('p');
-    p.className = 'dialog-text';
-    p.textContent = `• ${n}`;
-    modal.appendChild(p);
-  });
+  try {
+    const versions = Object.keys(releaseHistory).sort((a, b) => {
+      const pa = a.split('.').map(Number); const pb = b.split('.').map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const da = pa[i] || 0; const db = pb[i] || 0; if (da !== db) return db - da;
+      }
+      return 0;
+    });
+    versions.forEach(v => {
+      const vh = document.createElement('p');
+      vh.className = 'dialog-text';
+      vh.textContent = `版本 ${v}`;
+      modal.appendChild(vh);
+      const items = Array.isArray(releaseHistory[v]) ? releaseHistory[v] : [];
+      items.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; modal.appendChild(p); });
+    });
+  } catch {
+    releaseNotes.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; modal.appendChild(p); });
+  }
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+}
+
+function openSettings() {
+  if (document.querySelector('.modal-backdrop.active-block')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  const sbtn = document.getElementById('settingsBtn');
+  if (sbtn) sbtn.hidden = true;
+  close.addEventListener('click', () => { blockingModalOpen = false; document.body.removeChild(overlay); const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false; });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '設定';
+  const ver = document.createElement('p');
+  ver.className = 'dialog-text';
+  ver.textContent = `版本：${appVersion}`;
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  const report = document.createElement('a');
+  report.className = 'button';
+  report.href = FEEDBACK_URL;
+  report.target = '_blank';
+  report.rel = 'noopener';
+  report.textContent = '回報錯誤/建議';
+  const volWrap = document.createElement('div');
+  volWrap.className = 'actions';
+  const volLabel = document.createElement('span');
+  volLabel.className = 'route';
+  volLabel.textContent = '音量：';
+  const volSlider = document.createElement('input');
+  volSlider.type = 'range';
+  volSlider.min = '0';
+  volSlider.max = '100';
+  volSlider.value = String(Math.round((bgmVolume || 0.35) * 100));
+  volSlider.addEventListener('input', () => {
+    const val = Math.max(0, Math.min(100, parseInt(volSlider.value, 10) || 0));
+    const nv = val / 100;
+    bgmVolume = nv;
+    if (bgmAudio) bgmAudio.volume = nv;
+    setStoredVolume(nv);
+  });
+  const toHome = document.createElement('button');
+  toHome.className = 'button';
+  toHome.type = 'button';
+  toHome.textContent = '回到首頁';
+  toHome.addEventListener('click', () => {
+    showConfirmModal('返回主頁', '此操作將放棄本局進度，確定嗎？', '確定', () => { resetGlobalState(); blockingModalOpen = false; try { document.body.removeChild(overlay); } catch {} navigateHome(); });
+  });
+  const restart = document.createElement('button');
+  restart.className = 'button';
+  restart.type = 'button';
+  restart.textContent = '重來一次';
+  restart.addEventListener('click', () => {
+    showConfirmModal('重來一次', '將從第一關重新開始本局，確定嗎？', '確定', () => {
+      resetGlobalState();
+      blockingModalOpen = false;
+      try { document.body.removeChild(overlay); } catch {}
+      const nm = (localStorage.getItem('hanliu_player_name') || '無名'); if (input) input.value = nm;
+      navigateHome();
+      setTimeout(() => { start(); }, 0);
+    });
+  });
+  const notice = document.createElement('button');
+  notice.className = 'button';
+  notice.type = 'button';
+  notice.textContent = '公告';
+  notice.addEventListener('click', () => { openNotice(); });
+  const about = document.createElement('button');
+  about.className = 'button';
+  about.type = 'button';
+  about.textContent = '關於遊戲';
+  about.addEventListener('click', () => { openAbout(); });
+  actions.appendChild(report);
+  actions.appendChild(toHome);
+  actions.appendChild(restart);
+  actions.appendChild(notice);
+  actions.appendChild(about);
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(ver);
+  modal.appendChild(volWrap);
+  volWrap.appendChild(volLabel);
+  volWrap.appendChild(volSlider);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  blockingModalOpen = true;
 }
 
 function retryGame() {
@@ -2560,16 +2691,19 @@ function openAbout() {
   const gameName = document.createElement('p');
   gameName.className = 'dialog-text';
   gameName.textContent = '遊戲名稱：寒流';
+  const d0 = document.createElement('p'); d0.className = 'dialog-text'; d0.textContent = '總設計：楊竣傑';
   const d1 = document.createElement('p'); d1.className = 'dialog-text'; d1.textContent = '程式開發：Trae.ai (AI 輔助實作)';
   const d2 = document.createElement('p'); d2.className = 'dialog-text'; d2.textContent = '專案指導與架構分析：Gemini (AI 協作顧問)';
-  const d3 = document.createElement('p'); d3.className = 'dialog-text'; d3.textContent = '視覺素材：Gemini (AI 繪圖)';
-  const d4 = document.createElement('p'); d4.className = 'dialog-text'; d4.textContent = '數據來源：經典文獻與韓柳文集、上課簡報';
-  const d5 = document.createElement('p'); d5.className = 'dialog-text'; d5.textContent = '品質管制顧問 (QC)：楊采樺';
-  const d6 = document.createElement('p'); d6.className = 'dialog-text'; d6.textContent = '專案政策顧問：鍾旻諺、李聖億';
-  const d7 = document.createElement('p'); d7.className = 'dialog-text'; d7.textContent = `版本：${appVersion}`;
+  const d3 = document.createElement('p'); d3.className = 'dialog-text'; d3.textContent = '背景音樂：楊竣傑';
+  const d4 = document.createElement('p'); d4.className = 'dialog-text'; d4.textContent = '視覺素材：Gemini (AI 繪圖)';
+  const d5 = document.createElement('p'); d5.className = 'dialog-text'; d5.textContent = '數據來源：經典文獻與韓柳文集、上課簡報';
+  const d6 = document.createElement('p'); d6.className = 'dialog-text'; d6.textContent = '品質管制顧問 (QC)：楊采樺';
+  const d7 = document.createElement('p'); d7.className = 'dialog-text'; d7.textContent = '專案政策顧問：鍾旻諺、李聖億';
+  const d8 = document.createElement('p'); d8.className = 'dialog-text'; d8.textContent = `版本：${appVersion}`;
   modal.appendChild(close);
   modal.appendChild(title);
   modal.appendChild(gameName);
+  modal.appendChild(d0);
   modal.appendChild(d1);
   modal.appendChild(d2);
   modal.appendChild(d3);
@@ -2577,6 +2711,7 @@ function openAbout() {
   modal.appendChild(d5);
   modal.appendChild(d6);
   modal.appendChild(d7);
+  modal.appendChild(d8);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 }
@@ -2631,7 +2766,7 @@ const sentenceBank = [
   { question: '寬而栗柔而立願而恭亂而敬擾而毅直而溫簡而廉剛而塞強而義彰厥有常吉哉', correctSegmentation: '寬而栗/柔而立/願而恭/亂而敬/擾而毅/直而溫/簡而廉/剛而塞/強而義/彰厥有常/吉哉' },
   { question: '凡學之道嚴師為難師嚴然後道尊道尊然後民知敬學', correctSegmentation: '凡學之道/嚴師為難/師嚴然後道尊/道尊然後民知敬學' },
   { question: '易有太極是生兩儀兩儀生四象四象生八卦八卦定吉凶吉凶生大業', correctSegmentation: '易有太極/是生兩儀/兩儀生四象/四象生八卦/八卦定吉凶/吉凶生大業' },
-  { question: '十有一年春滕侯薛侯來朝', correctSegmentation: '十有一年/春/滕侯/薛侯來朝' },
+  { question: '九月宋人執鄭祭仲突歸於鄭鄭忽出奔衛', correctSegmentation: '九月/宋人執鄭祭仲/突歸於鄭/鄭忽出奔衛' },
 ];
 
 function sampleQuestions(bank, n) {
@@ -3035,9 +3170,9 @@ function showIdeaModal(excerpt, idea, onClose) {
 }
 
 function showConfirmModal(titleText, messageText, confirmText, onConfirm) {
-  if (document.querySelector('.modal-backdrop.active-block')) return;
+  if (document.querySelector('.modal-backdrop.active-block.confirm')) return;
   const overlay = document.createElement('div');
-  overlay.className = 'modal-backdrop active-block';
+  overlay.className = 'modal-backdrop active-block confirm';
   const modal = document.createElement('div');
   modal.className = 'modal';
   modal.classList.add('confirm-modal');
@@ -3417,7 +3552,13 @@ function start() {
   startScreen.style.display = 'none';
   isGameOver = false;
   systemCleanup(false);
-  try { Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } }); blockingModalOpen = false; } catch {}
+  try {
+    Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
+    Array.from(document.querySelectorAll('.flash-overlay')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
+    const baseBackdrop = document.getElementById('modalBackdrop');
+    if (baseBackdrop) baseBackdrop.hidden = true;
+    blockingModalOpen = false;
+  } catch {}
   matchScore = 0;
   orderFailed = false;
   lastRunId = null;
@@ -3428,6 +3569,10 @@ function start() {
   document.documentElement.style.removeProperty('--bg-image');
   document.documentElement.style.removeProperty('--bg-overlay');
   document.documentElement.style.removeProperty('--bg-overlay');
+  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
+  const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = true;
+  const hv = document.getElementById('homeVolume'); if (hv) hv.hidden = true;
+  const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
   resetHpBar();
   createDialogContainer(playerName);
 }
@@ -3481,16 +3626,13 @@ document.addEventListener('keydown', (e) => {
     });
   }
 });
+const settingsBtn = document.getElementById('settingsBtn');
+if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
 setupBgmAutoplay();
 initBgm();
 playBgm();
 document.documentElement.style.setProperty('--bg-image', "url('home.png')");
 document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
-const globalBgmToggle = document.getElementById('globalBgmToggle');
-  if (globalBgmToggle) {
-    globalBgmToggle.textContent = bgmEnabled ? '♪' : '🔇';
-    globalBgmToggle.addEventListener('click', toggleBgm);
-  }
   // 自動從網址參數寫入雲端設定（避免每台裝置手動輸入）。
   try {
     const sp = new URLSearchParams(location.search);
@@ -3574,6 +3716,24 @@ function showHpBar() {
       bgmBtn.style.padding = '0.3rem 0.5rem';
       bgmBtn.addEventListener('click', toggleBgm);
       bar.appendChild(bgmBtn);
+    }
+    let charBtn = bar.querySelector('#characterToggle');
+    if (!charBtn) {
+      charBtn = document.createElement('button');
+      charBtn.id = 'characterToggle';
+      charBtn.type = 'button';
+      charBtn.className = 'button';
+      charBtn.textContent = '隱藏角色';
+      charBtn.style.marginTop = '0';
+      charBtn.style.padding = '0.3rem 0.5rem';
+      charBtn.addEventListener('click', () => {
+        const wrap = document.getElementById('characterDisplay');
+        if (!wrap) return;
+        const nowHidden = !wrap.hidden;
+        wrap.hidden = nowHidden;
+        charBtn.textContent = nowHidden ? '顯示角色' : '隱藏角色';
+      });
+      bar.appendChild(charBtn);
     }
     if (!window.scoreDisplayIntervalId) {
       window.scoreDisplayIntervalId = trackedSetInterval(() => {
@@ -3735,4 +3895,39 @@ function openCloudConfig() {
   sec.appendChild(authInput);
   sec.appendChild(status);
   sec.appendChild(actions);
+}
+// 首頁音量滑桿
+const homeVol = document.getElementById('homeVolume');
+if (homeVol) {
+  homeVol.hidden = false;
+  homeVol.value = String(Math.round((getStoredVolume() || 0.35) * 100));
+  homeVol.addEventListener('input', () => {
+    const val = Math.max(0, Math.min(100, parseInt(homeVol.value, 10) || 0));
+    const nv = val / 100;
+    bgmVolume = nv;
+    if (bgmAudio) bgmAudio.volume = nv;
+    setStoredVolume(nv);
+  });
+}
+const homeVolToggle = document.getElementById('homeVolumeToggle');
+if (homeVolToggle) {
+  homeVolToggle.addEventListener('click', () => {
+    const hv = document.getElementById('homeVolume');
+    if (hv) {
+      const vis = hv.classList.toggle('is-visible');
+      hv.hidden = !vis;
+    }
+  });
+}
+function resetGlobalState() {
+  matchScore = 0;
+  errorCount = 0;
+  orderFailed = false;
+  lastRunId = null;
+  customNumberFailText = null;
+  currentLevel = 1;
+  currentLevelIndex = -1;
+  cloudSyncDisabled = false;
+  isGameOver = false;
+  mismatchCounter = 0;
 }

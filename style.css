@@ -166,7 +166,7 @@ body {
 
 .modal-close {
   position: absolute;
-  top: 10px;
+  top: 12px;
   right: 12px;
   width: 36px;
   height: 36px;
@@ -464,6 +464,13 @@ body {
   font-weight: 900;
   text-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
+#levelEpitaph .ordering-list { display: flex; flex-direction: column; gap: 10px; }
+#levelEpitaph .ordering-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid #2a2a2a; background: linear-gradient(180deg, #1d1f21, #161719); }
+#levelEpitaph .ordering-item.drag-over { outline: 2px solid #3b82f6; background: linear-gradient(180deg, #222, #1a1a1a); }
+#levelEpitaph .order-index { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #2a2a2a; background: #2a2a2a; color: var(--fg); display: flex; align-items: center; justify-content: center; font-weight: 800; }
+#levelEpitaph .order-preview { margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid #2a2a2a; background: linear-gradient(180deg, #1d1f21, #161719); white-space: pre-wrap; }
+/* 第九關題目文字提亮 */
+#levelEpitaph .ordering-item .dialog-text { color: #f8e78e; font-weight: 800; letter-spacing: 0.04em; }
 /* Level 10 核心樣式 */
 #level-container { display: flex; justify-content: center; align-items: center; }
 #game-container {
@@ -491,42 +498,32 @@ body {
 @media (max-width: 900px) {
   #levelFiveOriginals .card-grid { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
 }
-#globalBgmToggle.button.sound-toggle,
-.sound-toggle {
-  position: fixed;
-  right: 12px;
-  top: 12px;
-  z-index: 1000;
-  padding: 0.3rem 0.5rem;
-}
-/* 全域回報按鈕樣式 */
-#feedback-btn  {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    background-color: #3498db;
-    color: white;
-    padding: 10px 15px;
-    border-radius: 5px;
-    text-decoration: none;
-    font-size: 16px;
-    z-index: 1000;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    transition: background-color 0.3s;
-}
-
-#feedback-btn:hover  {
-    background-color: #2980b9; /* 懸停時顏色變深 */
-}
-
+/* 移除全域音量按鈕樣式 */
 /* 響應式：在手機上稍微縮小並調整位置 */
 @media screen and (max-width: 800px ) {
-    #feedback-btn  {
-        bottom: 10px;
-        left: 10px;
-        font-size: 14px;
-        padding: 8px 12px;
-    }
+  #characterDisplay {
+    right: 8px;
+    bottom: 8px;
+    width: 88px;
+    opacity: 0.95;
+  }
+  .dialog-container {
+    padding-bottom: 120px;
+  }
+  .settings-toggle {
+    right: 10px;
+    top: 10px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  #feedback-btn { bottom: 10px; left: 10px; font-size: 14px; padding: 8px 12px; }
+  .home-volume-toggle { right: 10px; top: 10px; width: 36px; height: 36px; }
+  .home-volume { right: 10px; top: 52px; width: 140px; }
+  .home-volume.is-visible { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
 }
 /* 第一關：句讀明義互動版 */
 .seg-box {
@@ -564,3 +561,68 @@ body {
 #startScreen .intro { color: #f1f5f9; font-size: 1.2rem; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 #startScreen .input { background: rgba(0,0,0,0.5); border-color: #335; color: #ffffff; }
 #startScreen .button { background: linear-gradient(180deg, rgba(24,26,28,0.92), rgba(18,19,21,0.92)); border-color: #335; }
+.settings-toggle {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #2a2a2a;
+  background: linear-gradient(180deg, #1d1f21, #161719);
+  color: var(--fg);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  z-index: 1000;
+}
+/* 首頁：回報按鈕左下角 */
+#feedback-btn  {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background-color: #3498db;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  text-decoration: none;
+  font-size: 16px;
+  z-index: 900;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s;
+}
+#feedback-btn:hover  { background-color: #2980b9; }
+/* 首頁：音量滑桿右上角與切換按鈕 */
+.home-volume-toggle {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #2a2a2a;
+  background: linear-gradient(180deg, #1d1f21, #161719);
+  color: var(--fg);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 900;
+}
+.home-volume {
+  position: fixed;
+  right: 20px;
+  top: 64px;
+  width: 180px;
+  z-index: 900;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.home-volume.is-visible { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
