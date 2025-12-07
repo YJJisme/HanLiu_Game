@@ -19,9 +19,10 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.1.5';
-let releaseNotes = ['第九關 UI 直覺化：拖曳排序與即時預覽','設定面板新增音量滑桿；整合回報/首頁/重來/公告','移除下方固定回報按鈕以免遮擋','加入結算插圖（SS/S/A/B/C/D 等級對應）','SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景'];
+let appVersion = '1.1.6';
+let releaseNotes = ['分離背景音量與音效音量','首頁以視窗集中調整音量','♪ 再次點擊可關閉音量視窗','音量標籤文字加粗提亮','雙滑桿位置分層不重疊','新增多種 WebAudio 音效（成功/失誤/受傷/收集/轉場）','錯誤與受傷時播放提示音','音效音量獨立保存，不影響背景音'];
 let releaseHistory = {
+  '1.1.6': ['分離背景音量與音效音量','首頁改為視窗集中調整音量','♪ 再次點擊可關閉音量視窗','音量標籤文字加粗提亮','雙滑桿位置分層不重疊','新增多種 WebAudio 音效（成功/失誤/受傷/收集/轉場）','錯誤與受傷時播放提示音','音效音量獨立保存'],
   '1.1.5': ['首頁♪音量滑桿淡入動畫','關於遊戲新增背景音樂：楊竣傑'],
   '1.1.4': ['設定紐開啟時隱藏並修復功能按鈕','首頁音量移至右上角並以♪顯示後展開滑桿','第九關段落文字提亮以增強辨識','修復「重來一次」與「回到首頁」動作'],
   '1.1.3': ['第九關 UI 直覺化：拖曳排序與即時預覽'],
@@ -50,15 +51,25 @@ let mismatchCounter = 0;
 let bgmAudio = null;
 let bgmEnabled = true;
 let bgmVolume = 0.35;
+let audioCtx = null;
+let sfxEnabled = true;
+let sfxVolume = 0.6;
 let orderFailed = false;
 let cloudSyncDisabled = false;
 let lastRunId = null;
 
 function initBgm() {
   if (bgmAudio) return;
-  bgmAudio = new Audio('music1.mp3');
+  const el = document.getElementById('bgm');
+  if (el && el.tagName === 'AUDIO') {
+    bgmAudio = el;
+  } else {
+    bgmAudio = new Audio('music1.mp3');
+  }
   bgmAudio.loop = true;
   bgmAudio.preload = 'auto';
+  bgmAudio.autoplay = true;
+  bgmAudio.muted = false;
   bgmVolume = getStoredVolume();
   bgmAudio.volume = bgmVolume;
 }
@@ -72,12 +83,152 @@ function getStoredVolume() {
 function setStoredVolume(v) {
   try { localStorage.setItem('hanliu_bgm_volume', String(v)); } catch {}
 }
+function getStoredSfxVolume() {
+  try {
+    const v = parseFloat(localStorage.getItem('hanliu_sfx_volume'));
+    if (!isNaN(v) && v >= 0 && v <= 1) return v;
+  } catch {}
+  return sfxVolume;
+}
+function setStoredSfxVolume(v) {
+  try { localStorage.setItem('hanliu_sfx_volume', String(v)); } catch {}
+}
+function ensureAudioCtx() {
+  if (audioCtx) return;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+}
+function resumeAudioCtx() {
+  try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch {}
+}
+function playClick() {
+  if (!sfxEnabled) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const base = Math.max(0.02, Math.min(0.6, (sfxVolume || 0.6)));
+  gain.gain.setValueAtTime(base, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(1100, t);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.09);
+}
+
+function sfxSuccess() {
+  if (!sfxEnabled) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.8), t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+  const o1 = audioCtx.createOscillator();
+  const o2 = audioCtx.createOscillator();
+  o1.type = 'sine';
+  o2.type = 'triangle';
+  o1.frequency.setValueAtTime(660, t);
+  o1.frequency.linearRampToValueAtTime(880, t + 0.2);
+  o2.frequency.setValueAtTime(990, t + 0.05);
+  o2.frequency.linearRampToValueAtTime(1320, t + 0.25);
+  o1.connect(g); o2.connect(g);
+  g.connect(audioCtx.destination);
+  o1.start(t); o2.start(t);
+  o1.stop(t + 0.3); o2.stop(t + 0.3);
+}
+
+function sfxError() {
+  if (!sfxEnabled) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.7), t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  const o = audioCtx.createOscillator();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(600, t);
+  o.frequency.linearRampToValueAtTime(220, t + 0.18);
+  o.connect(g);
+  g.connect(audioCtx.destination);
+  o.start(t);
+  o.stop(t + 0.22);
+}
+
+function sfxCoin() {
+  if (!sfxEnabled) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6)), t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+  const o = audioCtx.createOscillator();
+  o.type = 'square';
+  o.frequency.setValueAtTime(1200, t);
+  o.frequency.exponentialRampToValueAtTime(1800, t + 0.1);
+  o.connect(g);
+  g.connect(audioCtx.destination);
+  o.start(t);
+  o.stop(t + 0.12);
+}
+
+function sfxDamage() {
+  if (!sfxEnabled) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const len = Math.floor(audioCtx.sampleRate * 0.18);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) { data[i] = (Math.random() * 2 - 1) * 0.9; }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const bp = audioCtx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.setValueAtTime(400, t);
+  bp.Q.setValueAtTime(8, t);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.8), t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  src.connect(bp);
+  bp.connect(g);
+  g.connect(audioCtx.destination);
+  src.start(t);
+}
+
+function sfxWhoosh() {
+  if (!sfxEnabled) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const len = Math.floor(audioCtx.sampleRate * 0.35);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) { data[i] = (Math.random() * 2 - 1); }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(600, t);
+  lp.frequency.linearRampToValueAtTime(2200, t + 0.32);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(Math.max(0.02, (sfxVolume || 0.6) * 0.6), t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  src.connect(lp);
+  lp.connect(g);
+  g.connect(audioCtx.destination);
+  src.start(t);
+}
 
 function playBgm() {
   if (!bgmEnabled) return;
   if (!bgmAudio) initBgm();
   const p = bgmAudio.play();
-  if (p && typeof p.catch === 'function') { p.catch(() => {}); }
+  if (p && typeof p.catch === 'function') { p.catch(() => { try { showAudioEnableTip(); } catch {} }); }
 }
 
 function pauseBgm() {
@@ -96,12 +247,26 @@ function setupBgmAutoplay() {
   window.__bgmSetup = true;
   const handler = () => {
     initBgm();
+    try { if (bgmAudio) { bgmAudio.muted = false; bgmAudio.volume = bgmVolume; } } catch {}
     playBgm();
+    try { const tip = document.getElementById('audioTip'); if (tip) tip.remove(); } catch {}
     document.removeEventListener('click', handler);
     document.removeEventListener('keydown', handler);
   };
   document.addEventListener('click', handler, { once: true });
   document.addEventListener('keydown', handler, { once: true });
+}
+
+function showAudioEnableTip() {
+  if (document.getElementById('audioTip')) return;
+  const tip = document.createElement('div');
+  tip.id = 'audioTip';
+  tip.className = 'audio-tip';
+  const text = document.createElement('span');
+  text.className = 'audio-tip-text';
+  text.textContent = '點一下開啟音樂';
+  tip.appendChild(text);
+  document.body.appendChild(tip);
 }
 
 let isGameOver = false;
@@ -264,6 +429,7 @@ function handleError(levelType) {
     errorLock = true;
     errorCount += 1;
     updateHpBar();
+    try { sfxError(); sfxDamage(); } catch {}
   if (errorCount === 1) {
     showPunishOverlay();
     setTimeout(() => {
@@ -278,6 +444,7 @@ function handleError(levelType) {
     clearMainContent(true);
     hideCharacterDisplay();
     hideHpBar();
+    try { sfxDamage(); } catch {}
     if (currentLevel === 8) {
       const overlay = document.createElement('div');
       overlay.className = 'punish-overlay';
@@ -2257,6 +2424,7 @@ function navigateHome() {
   const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = false;
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = false;
   const hv = document.getElementById('homeVolume'); if (hv) { hv.classList.remove('is-visible'); hv.hidden = true; hv.value = String(Math.round((getStoredVolume() || 0.35) * 100)); }
+  const hsv = document.getElementById('homeSfxVolume'); if (hsv) { hsv.classList.remove('is-visible'); hsv.hidden = true; hsv.value = String(Math.round((getStoredSfxVolume() || 0.6) * 100)); }
 }
 
 function openNotice() {
@@ -2331,8 +2499,8 @@ function openSettings() {
   const volWrap = document.createElement('div');
   volWrap.className = 'actions';
   const volLabel = document.createElement('span');
-  volLabel.className = 'route';
-  volLabel.textContent = '音量：';
+  volLabel.className = 'volume-label';
+  volLabel.textContent = '背景音量：';
   const volSlider = document.createElement('input');
   volSlider.type = 'range';
   volSlider.min = '0';
@@ -2344,6 +2512,20 @@ function openSettings() {
     bgmVolume = nv;
     if (bgmAudio) bgmAudio.volume = nv;
     setStoredVolume(nv);
+  });
+  const sfxLabel = document.createElement('span');
+  sfxLabel.className = 'volume-label';
+  sfxLabel.textContent = '音效音量：';
+  const sfxSlider = document.createElement('input');
+  sfxSlider.type = 'range';
+  sfxSlider.min = '0';
+  sfxSlider.max = '100';
+  sfxSlider.value = String(Math.round((getStoredSfxVolume() || sfxVolume || 0.6) * 100));
+  sfxSlider.addEventListener('input', () => {
+    const val = Math.max(0, Math.min(100, parseInt(sfxSlider.value, 10) || 0));
+    const nv = val / 100;
+    sfxVolume = nv;
+    setStoredSfxVolume(nv);
   });
   const toHome = document.createElement('button');
   toHome.className = 'button';
@@ -2387,6 +2569,8 @@ function openSettings() {
   modal.appendChild(volWrap);
   volWrap.appendChild(volLabel);
   volWrap.appendChild(volSlider);
+  volWrap.appendChild(sfxLabel);
+  volWrap.appendChild(sfxSlider);
   modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -3572,6 +3756,7 @@ function start() {
   const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
   const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = true;
   const hv = document.getElementById('homeVolume'); if (hv) hv.hidden = true;
+  const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
   resetHpBar();
   createDialogContainer(playerName);
@@ -3626,11 +3811,19 @@ document.addEventListener('keydown', (e) => {
     });
   }
 });
+document.addEventListener('click', (e) => {
+  const el = e.target;
+  const btn = el && el.closest ? el.closest('.button') : null;
+  if (!btn) return;
+  try { playClick(); } catch {}
+});
 const settingsBtn = document.getElementById('settingsBtn');
 if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
 setupBgmAutoplay();
 initBgm();
 playBgm();
+try { sfxVolume = getStoredSfxVolume(); } catch {}
+document.addEventListener('pointerdown', () => { ensureAudioCtx(); resumeAudioCtx(); }, { once: true });
 document.documentElement.style.setProperty('--bg-image', "url('home.png')");
 document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
   // 自動從網址參數寫入雲端設定（避免每台裝置手動輸入）。
@@ -3899,7 +4092,7 @@ function openCloudConfig() {
 // 首頁音量滑桿
 const homeVol = document.getElementById('homeVolume');
 if (homeVol) {
-  homeVol.hidden = false;
+  homeVol.hidden = true;
   homeVol.value = String(Math.round((getStoredVolume() || 0.35) * 100));
   homeVol.addEventListener('input', () => {
     const val = Math.max(0, Math.min(100, parseInt(homeVol.value, 10) || 0));
@@ -3909,15 +4102,73 @@ if (homeVol) {
     setStoredVolume(nv);
   });
 }
+const homeSfxVol = document.getElementById('homeSfxVolume');
+if (homeSfxVol) {
+  homeSfxVol.hidden = true;
+  homeSfxVol.value = String(Math.round((getStoredSfxVolume() || 0.6) * 100));
+  homeSfxVol.addEventListener('input', () => {
+    const val = Math.max(0, Math.min(100, parseInt(homeSfxVol.value, 10) || 0));
+    const nv = val / 100;
+    sfxVolume = nv;
+    setStoredSfxVolume(nv);
+  });
+}
 const homeVolToggle = document.getElementById('homeVolumeToggle');
 if (homeVolToggle) {
-  homeVolToggle.addEventListener('click', () => {
-    const hv = document.getElementById('homeVolume');
-    if (hv) {
-      const vis = hv.classList.toggle('is-visible');
-      hv.hidden = !vis;
-    }
+  homeVolToggle.addEventListener('click', openHomeVolumeModal);
+}
+
+function openHomeVolumeModal() {
+  const existing = document.getElementById('homeVolumeBackdrop');
+  if (existing) { try { document.body.removeChild(existing); } catch {} return; }
+  const overlay = document.createElement('div');
+  overlay.id = 'homeVolumeBackdrop';
+  overlay.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '音量設定';
+  const volWrap = document.createElement('div');
+  volWrap.className = 'actions';
+  const volLabel = document.createElement('span');
+  volLabel.className = 'volume-label';
+  volLabel.textContent = '背景音量：';
+  const volSlider = document.createElement('input');
+  volSlider.type = 'range';
+  volSlider.min = '0';
+  volSlider.max = '100';
+  volSlider.value = String(Math.round((getStoredVolume() || bgmVolume || 0.35) * 100));
+  volSlider.addEventListener('input', () => {
+    const val = Math.max(0, Math.min(100, parseInt(volSlider.value, 10) || 0));
+    const nv = val / 100;
+    bgmVolume = nv;
+    if (bgmAudio) bgmAudio.volume = nv;
+    setStoredVolume(nv);
   });
+  const sfxLabel = document.createElement('span');
+  sfxLabel.className = 'volume-label';
+  sfxLabel.textContent = '音效音量：';
+  const sfxSlider = document.createElement('input');
+  sfxSlider.type = 'range';
+  sfxSlider.min = '0';
+  sfxSlider.max = '100';
+  sfxSlider.value = String(Math.round((getStoredSfxVolume() || sfxVolume || 0.6) * 100));
+  sfxSlider.addEventListener('input', () => {
+    const val = Math.max(0, Math.min(100, parseInt(sfxSlider.value, 10) || 0));
+    const nv = val / 100;
+    sfxVolume = nv;
+    setStoredSfxVolume(nv);
+  });
+  modal.appendChild(title);
+  modal.appendChild(volWrap);
+  volWrap.appendChild(volLabel);
+  volWrap.appendChild(volSlider);
+  volWrap.appendChild(sfxLabel);
+  volWrap.appendChild(sfxSlider);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) { try { document.body.removeChild(overlay); } catch {} } });
 }
 function resetGlobalState() {
   matchScore = 0;

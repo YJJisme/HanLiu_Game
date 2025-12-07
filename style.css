@@ -264,6 +264,7 @@ body {
 }
 
 #characterDisplay img { display: block; width: 100%; height: auto; }
+ #bgm { display: none; }
 
 #hpBar {
   position: fixed;
@@ -370,6 +371,7 @@ body {
  
 .modal-title { margin: 0 0 1rem; font-size: 1.9rem; letter-spacing: 0.12em; color: var(--title); text-align: center; font-weight: 900; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .modal .dialog-text { color: #f1f5f9; font-size: 1.15rem; font-weight: 900; letter-spacing: 0.04em; text-shadow: 0 1px 0 rgba(0,0,0,0.35); }
+.volume-label { display: inline-block; color: #ffffff; font-weight: 900; letter-spacing: 0.08em; font-size: 1.15rem; text-shadow: 0 2px 8px rgba(0,0,0,0.45); margin: 0.5rem 0 0.25rem; }
 
 /* 分數浮動提示 */
 .score-float {
@@ -522,7 +524,9 @@ body {
   }
   #feedback-btn { bottom: 10px; left: 10px; font-size: 14px; padding: 8px 12px; }
   .home-volume-toggle { right: 10px; top: 10px; width: 36px; height: 36px; }
-  .home-volume { right: 10px; top: 52px; width: 140px; }
+  .home-volume { right: 10px; width: 140px; }
+  #homeVolume { top: 52px; }
+  #homeSfxVolume { top: 88px; }
   .home-volume.is-visible { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
 }
 /* 第一關：句讀明義互動版 */
@@ -626,3 +630,8 @@ body {
   transition: opacity 220ms ease, transform 220ms ease;
 }
 .home-volume.is-visible { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+ .audio-tip { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; border: 1px solid #2a2a2a; background: linear-gradient(180deg, #1d1f21, #161719); color: #ffffff; font-weight: 900; letter-spacing: 0.06em; z-index: 1000; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+ .audio-tip-text { display: inline-block; text-shadow: 0 1px 0 rgba(0,0,0,0.45); }
+/* 分離兩個首頁滑桿的位置，避免重疊 */
+#homeVolume { top: 64px; }
+#homeSfxVolume { top: 104px; }
