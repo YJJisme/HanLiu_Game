@@ -2692,6 +2692,14 @@ function openSettings() {
   report.textContent = '回報錯誤/建議';
   const volWrap = document.createElement('div');
   volWrap.className = 'actions';
+  volWrap.style.display = 'flex';
+  volWrap.style.flexDirection = 'column';
+  volWrap.style.alignItems = 'stretch';
+  volWrap.style.gap = '0.5rem';
+  volWrap.style.display = 'flex';
+  volWrap.style.flexDirection = 'column';
+  volWrap.style.alignItems = 'stretch';
+  volWrap.style.gap = '0.5rem';
   const volLabel = document.createElement('span');
   volLabel.className = 'volume-label';
   volLabel.textContent = '背景音量：';
@@ -2772,13 +2780,28 @@ function openSettings() {
   modal.appendChild(title);
   modal.appendChild(ver);
   if (isAccountBound()) modal.appendChild(nick);
+  const bgmGroup = document.createElement('div');
+  bgmGroup.style.display = 'flex';
+  bgmGroup.style.flexDirection = 'column';
+  bgmGroup.style.gap = '0.25rem';
+  bgmGroup.appendChild(volLabel);
+  bgmGroup.appendChild(volSlider);
+  const sfxGroup = document.createElement('div');
+  sfxGroup.style.display = 'flex';
+  sfxGroup.style.flexDirection = 'column';
+  sfxGroup.style.gap = '0.25rem';
+  sfxGroup.appendChild(sfxLabel);
+  sfxGroup.appendChild(sfxSlider);
+  const fxGroup = document.createElement('div');
+  fxGroup.style.display = 'flex';
+  fxGroup.style.flexDirection = 'column';
+  fxGroup.style.gap = '0.25rem';
+  fxGroup.appendChild(fxLabel);
+  fxGroup.appendChild(fxToggle);
   modal.appendChild(volWrap);
-  volWrap.appendChild(volLabel);
-  volWrap.appendChild(volSlider);
-  volWrap.appendChild(sfxLabel);
-  volWrap.appendChild(sfxSlider);
-  volWrap.appendChild(fxLabel);
-  volWrap.appendChild(fxToggle);
+  volWrap.appendChild(bgmGroup);
+  volWrap.appendChild(sfxGroup);
+  volWrap.appendChild(fxGroup);
   modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -4269,6 +4292,41 @@ async function syncAccountToCloud(acc) {
     await fetch(ep, { method: 'POST', headers: { 'content-type': 'application/json', ...(au ? { authorization: au } : {}) }, body: JSON.stringify({ id: acc.id, name: acc.name, salt: acc.salt, hash: acc.hash, ts: acc.ts }) }).catch(() => {});
   } catch {}
 }
+async function deleteAccountFromCloud(acc) {
+  const ep = getAccountEndpoint();
+  const au = getAccountAuth();
+  if (!ep || !acc || !acc.id) return;
+  try {
+    const url = ep + (ep.includes('?') ? '&' : '?') + 'id=' + encodeURIComponent(acc.id);
+    await fetch(url, { method: 'DELETE', headers: { ...(au ? { authorization: au } : {}) } }).catch(() => {});
+  } catch {
+    try {
+      await fetch(ep, { method: 'POST', headers: { 'content-type': 'application/json', ...(au ? { authorization: au } : {}) }, body: JSON.stringify({ action: 'delete', id: acc.id }) });
+    } catch {}
+  }
+}
+async function clearAccountUnlocksCloud(acc) {
+  const ep = getUnlockEndpoint();
+  const au = getUnlockAuth();
+  if (!ep || !acc || !acc.id) return;
+  try {
+    await fetch(ep, { method: 'POST', headers: { 'content-type': 'application/json', ...(au ? { authorization: au } : {}) }, body: JSON.stringify({ kind: 'unlocks', accountId: acc.id, items: [], ts: Date.now() }) }).catch(() => {});
+  } catch {}
+}
+function removeAccountUnlocksLocal(accId) {
+  try {
+    const raw = localStorage.getItem('hanliu_unlocks');
+    const map = raw ? JSON.parse(raw) : {};
+    if (accId && map && Object.prototype.hasOwnProperty.call(map, accId)) {
+      delete map[accId];
+      localStorage.setItem('hanliu_unlocks', JSON.stringify(map));
+    }
+  } catch {}
+}
+function clearLocalAccount() {
+  try { localStorage.removeItem('hanliu_account'); } catch {}
+  try { localStorage.removeItem('hanliu_account_name'); } catch {}
+}
 async function loadAccountFromCloud(name) {
   const ep = getAccountEndpoint();
   const au = getAccountAuth();
@@ -4522,9 +4580,14 @@ function openAccountDialog() {
   loginBtn.className = 'button';
   loginBtn.type = 'button';
   loginBtn.textContent = '登入';
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'button';
+  deleteBtn.type = 'button';
+  deleteBtn.textContent = '註銷帳號';
   const applyNameState = () => {
     const acc = getStoredAccount();
     if (acc && acc.name) { nameInput.value = acc.name; nameInput.readOnly = true; nameInput.disabled = true; } else { nameInput.readOnly = false; nameInput.disabled = false; }
+    deleteBtn.disabled = !(acc && acc.id);
   };
   applyNameState();
   registerBtn.addEventListener('click', async () => {
@@ -4562,6 +4625,24 @@ function openAccountDialog() {
     try { document.body.removeChild(overlay); } catch {}
     dismissAuthGateToHome();
   });
+  deleteBtn.addEventListener('click', async () => {
+    const acc = getStoredAccount();
+    if (!acc || !acc.id) { status.textContent = '尚未註冊'; return; }
+    const pw = String(passInput.value || '').trim();
+    if (!pw) { status.textContent = '請輸入密碼以註銷'; return; }
+    const h = await deriveAccountHash(pw, acc.salt).catch(() => '');
+    if (!h || h !== acc.hash) { status.textContent = '密碼錯誤'; return; }
+    status.textContent = '正在註銷...';
+    await clearAccountUnlocksCloud(acc).catch(() => {});
+    await deleteAccountFromCloud(acc).catch(() => {});
+    removeAccountUnlocksLocal(acc.id);
+    clearLocalAccount();
+    applyPlayerNameInputState();
+    status.textContent = '已註銷';
+    blockingModalOpen = false;
+    try { document.body.removeChild(overlay); } catch {}
+    dismissAuthGateToHome();
+  });
   modal.appendChild(close);
   modal.appendChild(title);
   modal.appendChild(status);
@@ -4572,6 +4653,7 @@ function openAccountDialog() {
   content.appendChild(passInput);
   actions.appendChild(registerBtn);
   actions.appendChild(loginBtn);
+  actions.appendChild(deleteBtn);
   modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -4788,12 +4870,22 @@ function openHomeVolumeModal() {
     sfxVolume = nv;
     setStoredSfxVolume(nv);
   });
+  const bgmGroup = document.createElement('div');
+  bgmGroup.style.display = 'flex';
+  bgmGroup.style.flexDirection = 'column';
+  bgmGroup.style.gap = '0.25rem';
+  bgmGroup.appendChild(volLabel);
+  bgmGroup.appendChild(volSlider);
+  const sfxGroup = document.createElement('div');
+  sfxGroup.style.display = 'flex';
+  sfxGroup.style.flexDirection = 'column';
+  sfxGroup.style.gap = '0.25rem';
+  sfxGroup.appendChild(sfxLabel);
+  sfxGroup.appendChild(sfxSlider);
   modal.appendChild(title);
   modal.appendChild(volWrap);
-  volWrap.appendChild(volLabel);
-  volWrap.appendChild(volSlider);
-  volWrap.appendChild(sfxLabel);
-  volWrap.appendChild(sfxSlider);
+  volWrap.appendChild(bgmGroup);
+  volWrap.appendChild(sfxGroup);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) { try { document.body.removeChild(overlay); } catch {} } });
