@@ -4248,6 +4248,57 @@ function getUnlockEndpoint() {
 function getUnlockAuth() {
   try { return localStorage.getItem('hanliu_cloud_unlock_auth') || getCloudAuth(); } catch { return getCloudAuth(); }
 }
+function getAccountEndpoint() {
+  try {
+    const v = localStorage.getItem('hanliu_cloud_account_endpoint');
+    if (v && String(v).trim()) return String(v).trim();
+    const base = getCloudEndpoint();
+    if (!base) return '';
+    if (/scores\/?$/.test(base)) return base.replace(/scores\/?$/, 'accounts');
+    return base + '/accounts';
+  } catch { return ''; }
+}
+function getAccountAuth() {
+  try { return localStorage.getItem('hanliu_cloud_account_auth') || getCloudAuth(); } catch { return getCloudAuth(); }
+}
+async function syncAccountToCloud(acc) {
+  const ep = getAccountEndpoint();
+  const au = getAccountAuth();
+  if (!ep || !acc) return;
+  try {
+    await fetch(ep, { method: 'POST', headers: { 'content-type': 'application/json', ...(au ? { authorization: au } : {}) }, body: JSON.stringify({ id: acc.id, name: acc.name, salt: acc.salt, hash: acc.hash, ts: acc.ts }) }).catch(() => {});
+  } catch {}
+}
+async function loadAccountFromCloud(name) {
+  const ep = getAccountEndpoint();
+  const au = getAccountAuth();
+  const nm = String(name || '').trim();
+  if (!ep || !nm) return null;
+  try {
+    const url = ep + (ep.includes('?') ? '&' : '?') + 'name=' + encodeURIComponent(nm);
+    const r = await fetch(url, { headers: { ...(au ? { authorization: au } : {}) } });
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => null);
+    if (!data || !data.id || !data.salt || !data.hash) return null;
+    return { id: String(data.id), name: String(data.name || nm), salt: String(data.salt), hash: String(data.hash), ts: Number(data.ts || Date.now()) };
+  } catch { return null; }
+}
+function dismissAuthGateToHome() {
+  const main = document.querySelector('main.container');
+  const startScreen = document.getElementById('startScreen');
+  document.documentElement.style.setProperty('--bg-image', "url('home.png')");
+  document.documentElement.style.setProperty('--bg-overlay', 'none');
+  const gateActions = document.getElementById('authGateActions');
+  if (gateActions && main) { try { main.removeChild(gateActions); } catch {} }
+  if (startScreen) startScreen.style.display = '';
+  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
+  applyPlayerNameInputState();
+  const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = false;
+  const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = false;
+  const hsv2 = document.getElementById('homeSfxVolume'); if (hsv2) hsv2.hidden = false;
+  const inputEl = document.getElementById('playerName');
+  try { if (inputEl) inputEl.focus(); } catch {}
+}
 async function syncUnlocksFromCloud() {
   if (!isAccountBound()) return;
   const acc = getStoredAccount();
@@ -4486,13 +4537,20 @@ function openAccountDialog() {
     if (!hash) { status.textContent = '無法建立帳號'; return; }
     const acc = { id: genAccountId(), name: nm, salt, hash, ts: Date.now() };
     setStoredAccount(acc);
+    try { await syncAccountToCloud(acc); } catch {}
     applyPlayerNameInputState();
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
+    dismissAuthGateToHome();
   });
   loginBtn.addEventListener('click', async () => {
-    const acc = getStoredAccount();
-    if (!acc || !acc.salt || !acc.hash) { status.textContent = '尚未註冊'; return; }
+    let acc = getStoredAccount();
+    if (!acc || !acc.salt || !acc.hash) {
+      const nm = String(nameInput.value || '').trim();
+      acc = await loadAccountFromCloud(nm).catch(() => null);
+      if (!acc || !acc.salt || !acc.hash) { status.textContent = '尚未註冊'; return; }
+      setStoredAccount(acc);
+    }
     const pw = String(passInput.value || '').trim();
     if (!pw) { status.textContent = '請輸入密碼'; return; }
     const h = await deriveAccountHash(pw, acc.salt).catch(() => '');
@@ -4502,6 +4560,7 @@ function openAccountDialog() {
     applyPlayerNameInputState();
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
+    dismissAuthGateToHome();
   });
   modal.appendChild(close);
   modal.appendChild(title);
@@ -4558,6 +4617,16 @@ function openCloudConfig() {
   unlockAuthInput.type = 'text';
   unlockAuthInput.placeholder = '圖鑑 Authorization（可空），例如 Bearer xxx';
   unlockAuthInput.value = getUnlockAuth() || '';
+  const accEpInput = document.createElement('input');
+  accEpInput.className = 'input';
+  accEpInput.type = 'text';
+  accEpInput.placeholder = '帳號 Endpoint（可空），例如 https://xxx.workers.dev/accounts';
+  accEpInput.value = getAccountEndpoint() || '';
+  const accAuthInput = document.createElement('input');
+  accAuthInput.className = 'input';
+  accAuthInput.type = 'text';
+  accAuthInput.placeholder = '帳號 Authorization（可空），例如 Bearer xxx';
+  accAuthInput.value = getAccountAuth() || '';
   const status = document.createElement('p');
   status.className = 'dialog-text';
   const actions = document.createElement('div');
@@ -4583,6 +4652,8 @@ function openCloudConfig() {
     try { if (authInput.value.trim()) localStorage.setItem('hanliu_cloud_auth', authInput.value.trim()); else localStorage.removeItem('hanliu_cloud_auth'); } catch {}
     try { if (unlockEpInput.value.trim()) localStorage.setItem('hanliu_cloud_unlock_endpoint', unlockEpInput.value.trim()); else localStorage.removeItem('hanliu_cloud_unlock_endpoint'); } catch {}
     try { if (unlockAuthInput.value.trim()) localStorage.setItem('hanliu_cloud_unlock_auth', unlockAuthInput.value.trim()); else localStorage.removeItem('hanliu_cloud_unlock_auth'); } catch {}
+    try { if (accEpInput.value.trim()) localStorage.setItem('hanliu_cloud_account_endpoint', accEpInput.value.trim()); else localStorage.removeItem('hanliu_cloud_account_endpoint'); } catch {}
+    try { if (accAuthInput.value.trim()) localStorage.setItem('hanliu_cloud_account_auth', accAuthInput.value.trim()); else localStorage.removeItem('hanliu_cloud_account_auth'); } catch {}
     status.textContent = '已保存';
   });
   test.addEventListener('click', () => {
@@ -4610,6 +4681,15 @@ function openCloudConfig() {
         })
         .catch(() => { status.textContent += '｜圖鑑失敗'; });
     }
+    const aurl = accEpInput.value.trim();
+    if (aurl) {
+      fetch(aurl, { headers: { ...(accAuthInput.value.trim() ? { authorization: accAuthInput.value.trim() } : {}) } })
+        .then(async (r) => {
+          const ok = r.ok;
+          status.textContent += ok ? '｜帳號 OK' : `｜帳號失敗 HTTP ${r.status}`;
+        })
+        .catch(() => { status.textContent += '｜帳號失敗'; });
+    }
   });
   wipe.addEventListener('click', () => {
     const url = epInput.value.trim();
@@ -4632,6 +4712,8 @@ function openCloudConfig() {
   sec.appendChild(authInput);
   sec.appendChild(unlockEpInput);
   sec.appendChild(unlockAuthInput);
+  sec.appendChild(accEpInput);
+  sec.appendChild(accAuthInput);
   sec.appendChild(status);
   sec.appendChild(actions);
 }
@@ -4808,6 +4890,7 @@ function openAuthGate() {
     const gateActions = document.getElementById('authGateActions');
     if (gateActions) { try { main.removeChild(gateActions); } catch {} }
     if (startScreen) startScreen.style.display = '';
+    const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
     applyPlayerNameInputState();
     const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = false;
     const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = false;
