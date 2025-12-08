@@ -19,9 +19,17 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.1.7';
+let appVersion = '1.2.0';
 let releaseNotes = ['結算頁加入分享結果按鈕','生成分享圖片（暱稱/分數/評語）','支援 Web Share；回退提供下載與複製','依評級自動匹配結算插圖'];
 let releaseHistory = {
+  '1.2.0': [
+    '新增登入選擇入口與隱私導向本機帳號',
+    '首頁登入按鈕響應式（橫排/直排）與定位優化',
+    '綁定帳號暱稱唯讀；遊客可編輯暱稱',
+    '新增圖鑑：遊玩後解鎖插圖並顯示',
+    '帳號登入者圖鑑跨裝置保存（雲端同步）',
+    '遊客圖鑑僅本次遊玩有效（重置後需重解）'
+  ],
   '1.1.7': ['結算頁加入分享結果按鈕','生成分享圖片（暱稱/分數/評語）','支援 Web Share；回退提供下載與複製','依評級自動匹配結算插圖'],
   '1.1.6': ['分離背景音量與音效音量','首頁改為視窗集中調整音量','♪ 再次點擊可關閉音量視窗','音量標籤文字加粗提亮','雙滑桿位置分層不重疊','新增多種 WebAudio 音效（成功/失誤/受傷/收集/轉場）','錯誤與受傷時播放提示音','音效音量獨立保存'],
   '1.1.5': ['首頁♪音量滑桿淡入動畫','關於遊戲新增背景音樂：楊竣傑'],
@@ -492,6 +500,7 @@ function handleError(levelType) {
     img.style.maxWidth = '280px';
     img.style.border = '1px solid #2a2a2a';
     img.style.borderRadius = '10px';
+    try { unlockIllustration(img.src); } catch {}
     const text = document.createElement('p');
     text.className = 'dialog-text';
     text.textContent = customNumberFailText || '你終究未能完成兄嫂的囑託，遺憾地結束了這段困頓的求仕之旅...';
@@ -3617,6 +3626,7 @@ function showBlockModal(titleText, bodyItems, onClose) {
         img.src = item.image;
         img.onerror = () => { try { img.src = 'home.png'; } catch {} };
         img.alt = item.alt || '';
+        try { unlockIllustration(item.image); } catch {}
         modal.appendChild(img);
         if (item.text) {
           const p = document.createElement('p');
@@ -3984,6 +3994,16 @@ if (noticeBtn) noticeBtn.addEventListener('click', openNotice);
 if (rankImportBtn) rankImportBtn.addEventListener('click', () => { if (rankFileInput) rankFileInput.click(); });
 if (rankFileInput) rankFileInput.addEventListener('change', importLeaderboard);
 aboutBtn.addEventListener('click', openAbout);
+const aboutParent = aboutBtn ? aboutBtn.parentElement : null;
+if (aboutParent) {
+  const galleryBtn = document.createElement('button');
+  galleryBtn.id = 'galleryBtn';
+  galleryBtn.className = 'button';
+  galleryBtn.type = 'button';
+  galleryBtn.textContent = '圖鑑';
+  galleryBtn.addEventListener('click', openGallery);
+  aboutParent.appendChild(galleryBtn);
+}
 if (debugStartBtn) debugStartBtn.addEventListener('click', () => {
   if (!devModeEnabled) {
     requirePassword(() => {
@@ -4049,6 +4069,10 @@ document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba
     const au = sp.get('cloud_auth');
     if (ep) localStorage.setItem('hanliu_cloud_endpoint', ep);
     if (au) localStorage.setItem('hanliu_cloud_auth', au);
+    const uep = sp.get('cloud_unlock_endpoint');
+    const uau = sp.get('cloud_unlock_auth');
+    if (uep) localStorage.setItem('hanliu_cloud_unlock_endpoint', uep);
+    if (uau) localStorage.setItem('hanliu_cloud_unlock_auth', uau);
     const pv = (sp.get('preview') || '').toLowerCase();
     const sc = parseInt(sp.get('score') || '', 10);
     const multi = (sp.get('scores') || '').split(',').map(x => parseInt(x.trim(), 10)).filter(x => !isNaN(x));
@@ -4211,6 +4235,289 @@ function getCloudEndpoint() {
 function getCloudAuth() {
   try { return localStorage.getItem('hanliu_cloud_auth') || CLOUD_SYNC_AUTH; } catch { return CLOUD_SYNC_AUTH; }
 }
+function getUnlockEndpoint() {
+  try {
+    const v = localStorage.getItem('hanliu_cloud_unlock_endpoint');
+    if (v && String(v).trim()) return String(v).trim();
+    const base = getCloudEndpoint();
+    if (!base) return '';
+    if (/scores\/?$/.test(base)) return base.replace(/scores\/?$/, 'unlocks');
+    return base + '/unlocks';
+  } catch { return ''; }
+}
+function getUnlockAuth() {
+  try { return localStorage.getItem('hanliu_cloud_unlock_auth') || getCloudAuth(); } catch { return getCloudAuth(); }
+}
+async function syncUnlocksFromCloud() {
+  if (!isAccountBound()) return;
+  const acc = getStoredAccount();
+  const ep = getUnlockEndpoint();
+  const au = getUnlockAuth();
+  if (!acc || !acc.id || !ep) return;
+  try {
+    const url = ep + (ep.includes('?') ? '&' : '?') + 'id=' + encodeURIComponent(acc.id);
+    const r = await fetch(url, { headers: { ...(au ? { authorization: au } : {}) } });
+    if (!r.ok) return;
+    const data = await r.json().catch(() => null);
+    if (!Array.isArray(data)) return;
+    const cur = getCurrentUnlocksSet();
+    data.forEach((k) => { const s = normalizeIllustrationKey(k); if (s) cur.add(s); });
+    persistCurrentUnlocks(cur);
+  } catch {}
+}
+async function syncUnlocksToCloud(set) {
+  if (!isAccountBound()) return;
+  const acc = getStoredAccount();
+  const ep = getUnlockEndpoint();
+  const au = getUnlockAuth();
+  if (!acc || !acc.id || !ep) return;
+  try {
+    const body = { kind: 'unlocks', accountId: acc.id, items: Array.from(set || []), ts: Date.now() };
+    await fetch(ep, { method: 'POST', headers: { 'content-type': 'application/json', ...(au ? { authorization: au } : {}) }, body: JSON.stringify(body) }).catch(() => {});
+  } catch {}
+}
+
+let guestUnlockedIllustrations = new Set();
+function normalizeIllustrationKey(p) {
+  const s = String(p || '').trim();
+  if (!s) return '';
+  const parts = s.split(/[\\/]/);
+  return parts[parts.length - 1];
+}
+function getIllustrationList() {
+  return [
+    'hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png',
+    'han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png'
+  ];
+}
+function loadAccountUnlocks() {
+  try { const raw = localStorage.getItem('hanliu_unlocks'); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+}
+function saveAccountUnlocks(obj) {
+  try { localStorage.setItem('hanliu_unlocks', JSON.stringify(obj || {})); } catch {}
+}
+function getCurrentUnlocksSet() {
+  if (isAccountBound()) {
+    const acc = getStoredAccount();
+    const map = loadAccountUnlocks();
+    const key = acc && acc.id ? String(acc.id) : '';
+    const list = key && Array.isArray(map[key]) ? map[key] : [];
+    return new Set(list);
+  }
+  return new Set(Array.from(guestUnlockedIllustrations));
+}
+function persistCurrentUnlocks(set) {
+  if (isAccountBound()) {
+    const acc = getStoredAccount();
+    const key = acc && acc.id ? String(acc.id) : '';
+    if (!key) return;
+    const map = loadAccountUnlocks();
+    map[key] = Array.from(set);
+    saveAccountUnlocks(map);
+    try { syncUnlocksToCloud(set); } catch {}
+  } else {
+    guestUnlockedIllustrations = new Set(Array.from(set));
+  }
+}
+function unlockIllustration(p) {
+  const k = normalizeIllustrationKey(p);
+  if (!k) return;
+  const cur = getCurrentUnlocksSet();
+  cur.add(k);
+  persistCurrentUnlocks(cur);
+}
+async function openGallery() {
+  if (document.querySelector('.modal-backdrop.active-block')) return;
+  try { await syncUnlocksFromCloud(); } catch {}
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '圖鑑';
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(160px, 1fr))';
+  grid.style.gap = '0.75rem';
+  const unlocked = getCurrentUnlocksSet();
+  const all = getIllustrationList();
+  all.forEach((key) => {
+    const cell = document.createElement('div');
+    cell.style.display = 'flex';
+    cell.style.flexDirection = 'column';
+    cell.style.alignItems = 'center';
+    cell.style.justifyContent = 'center';
+    cell.style.padding = '0.5rem';
+    cell.style.border = '1px solid #2a2a2a';
+    cell.style.borderRadius = '10px';
+    cell.style.minHeight = '180px';
+    const label = document.createElement('span');
+    label.className = 'dialog-text';
+    label.textContent = key;
+    label.style.fontSize = '0.95rem';
+    label.style.marginTop = '0.5rem';
+    if (unlocked.has(key)) {
+      const img = document.createElement('img');
+      img.className = 'illustration';
+      img.src = key;
+      img.alt = key;
+      img.style.width = 'min(140px, 38vw)';
+      img.style.maxHeight = '120px';
+      img.style.objectFit = 'contain';
+      cell.appendChild(img);
+      cell.appendChild(label);
+    } else {
+      const lock = document.createElement('div');
+      lock.textContent = '已鎖定';
+      lock.style.width = 'min(140px, 38vw)';
+      lock.style.maxHeight = '120px';
+      lock.style.display = 'flex';
+      lock.style.alignItems = 'center';
+      lock.style.justifyContent = 'center';
+      lock.style.background = 'linear-gradient(135deg, rgba(90,90,90,0.35), rgba(40,40,40,0.35))';
+      lock.style.border = '1px dashed #555';
+      lock.style.borderRadius = '10px';
+      lock.style.color = '#9aa0a6';
+      cell.appendChild(lock);
+      cell.appendChild(label);
+    }
+    grid.appendChild(cell);
+  });
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(grid);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+async function deriveAccountHash(password, saltB64) {
+  try {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']);
+    const salt = (() => { const bin = atob(saltB64); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; })();
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' }, key, 256);
+    const bytes = new Uint8Array(bits);
+    let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  } catch {
+    const enc = new TextEncoder();
+    const data = enc.encode(String(password || '') + String(saltB64 || ''));
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    const bytes = new Uint8Array(digest);
+    let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+}
+function genAccountId() {
+  try { if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch {}
+  return `hl-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+function genSaltB64() {
+  const arr = new Uint8Array(16);
+  try { crypto.getRandomValues(arr); } catch { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256); }
+  let s = ''; for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+  return btoa(s);
+}
+function getStoredAccount() {
+  try { const raw = localStorage.getItem('hanliu_account'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+function setStoredAccount(acc) {
+  try { localStorage.setItem('hanliu_account', JSON.stringify(acc)); localStorage.setItem('hanliu_account_name', String(acc && acc.name || '')); } catch {}
+}
+function openAccountDialog() {
+  if (document.querySelector('.modal-backdrop.active-block')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { blockingModalOpen = false; document.body.removeChild(overlay); });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '註冊 / 登入';
+  const status = document.createElement('p');
+  status.className = 'dialog-text';
+  const content = document.createElement('div');
+  content.className = 'actions';
+  const nameLabel = document.createElement('span');
+  nameLabel.className = 'volume-label';
+  nameLabel.textContent = '暱稱：';
+  const nameInput = document.createElement('input');
+  nameInput.className = 'input';
+  nameInput.type = 'text';
+  nameInput.placeholder = '2–16 個字';
+  const passLabel = document.createElement('span');
+  passLabel.className = 'volume-label';
+  passLabel.textContent = '密碼：';
+  const passInput = document.createElement('input');
+  passInput.className = 'input';
+  passInput.type = 'password';
+  passInput.placeholder = '至少 6 碼';
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  const registerBtn = document.createElement('button');
+  registerBtn.className = 'button';
+  registerBtn.type = 'button';
+  registerBtn.textContent = '註冊';
+  const loginBtn = document.createElement('button');
+  loginBtn.className = 'button';
+  loginBtn.type = 'button';
+  loginBtn.textContent = '登入';
+  const applyNameState = () => {
+    const acc = getStoredAccount();
+    if (acc && acc.name) { nameInput.value = acc.name; nameInput.readOnly = true; nameInput.disabled = true; } else { nameInput.readOnly = false; nameInput.disabled = false; }
+  };
+  applyNameState();
+  registerBtn.addEventListener('click', async () => {
+    const nm = String(nameInput.value || '').trim();
+    const pw = String(passInput.value || '').trim();
+    if (nm.length < 2 || nm.length > 16) { status.textContent = '暱稱需介於 2–16 字'; return; }
+    if (pw.length < 6 || pw.length > 64) { status.textContent = '密碼需至少 6 碼'; return; }
+    const salt = genSaltB64();
+    const hash = await deriveAccountHash(pw, salt).catch(() => '');
+    if (!hash) { status.textContent = '無法建立帳號'; return; }
+    const acc = { id: genAccountId(), name: nm, salt, hash, ts: Date.now() };
+    setStoredAccount(acc);
+    applyPlayerNameInputState();
+    blockingModalOpen = false;
+    try { document.body.removeChild(overlay); } catch {}
+  });
+  loginBtn.addEventListener('click', async () => {
+    const acc = getStoredAccount();
+    if (!acc || !acc.salt || !acc.hash) { status.textContent = '尚未註冊'; return; }
+    const pw = String(passInput.value || '').trim();
+    if (!pw) { status.textContent = '請輸入密碼'; return; }
+    const h = await deriveAccountHash(pw, acc.salt).catch(() => '');
+    if (!h || h !== acc.hash) { status.textContent = '密碼錯誤'; return; }
+    try { localStorage.setItem('hanliu_account_name', String(acc.name || '')); } catch {}
+    await syncUnlocksFromCloud().catch(() => {});
+    applyPlayerNameInputState();
+    blockingModalOpen = false;
+    try { document.body.removeChild(overlay); } catch {}
+  });
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(status);
+  modal.appendChild(content);
+  content.appendChild(nameLabel);
+  content.appendChild(nameInput);
+  content.appendChild(passLabel);
+  content.appendChild(passInput);
+  actions.appendChild(registerBtn);
+  actions.appendChild(loginBtn);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  blockingModalOpen = true;
+}
 
 function openCloudConfig() {
   const main = document.querySelector('main.container');
@@ -4241,6 +4548,16 @@ function openCloudConfig() {
   authInput.type = 'text';
   authInput.placeholder = 'Authorization（可空），例如 Bearer xxx';
   authInput.value = getCloudAuth() || '';
+  const unlockEpInput = document.createElement('input');
+  unlockEpInput.className = 'input';
+  unlockEpInput.type = 'text';
+  unlockEpInput.placeholder = '圖鑑 Endpoint（可空），例如 https://xxx.workers.dev/unlocks';
+  unlockEpInput.value = getUnlockEndpoint() || '';
+  const unlockAuthInput = document.createElement('input');
+  unlockAuthInput.className = 'input';
+  unlockAuthInput.type = 'text';
+  unlockAuthInput.placeholder = '圖鑑 Authorization（可空），例如 Bearer xxx';
+  unlockAuthInput.value = getUnlockAuth() || '';
   const status = document.createElement('p');
   status.className = 'dialog-text';
   const actions = document.createElement('div');
@@ -4264,6 +4581,8 @@ function openCloudConfig() {
   save.addEventListener('click', () => {
     try { localStorage.setItem('hanliu_cloud_endpoint', epInput.value.trim()); } catch {}
     try { if (authInput.value.trim()) localStorage.setItem('hanliu_cloud_auth', authInput.value.trim()); else localStorage.removeItem('hanliu_cloud_auth'); } catch {}
+    try { if (unlockEpInput.value.trim()) localStorage.setItem('hanliu_cloud_unlock_endpoint', unlockEpInput.value.trim()); else localStorage.removeItem('hanliu_cloud_unlock_endpoint'); } catch {}
+    try { if (unlockAuthInput.value.trim()) localStorage.setItem('hanliu_cloud_unlock_auth', unlockAuthInput.value.trim()); else localStorage.removeItem('hanliu_cloud_unlock_auth'); } catch {}
     status.textContent = '已保存';
   });
   test.addEventListener('click', () => {
@@ -4282,6 +4601,15 @@ function openCloudConfig() {
         else status.textContent = '連線成功';
       })
       .catch((err) => { status.textContent = `連線失敗：${String(err && err.message || err)}`; });
+    const uurl = unlockEpInput.value.trim();
+    if (uurl) {
+      fetch(uurl, { headers: { ...(unlockAuthInput.value.trim() ? { authorization: unlockAuthInput.value.trim() } : {}) } })
+        .then(async (r) => {
+          const ok = r.ok;
+          status.textContent += ok ? '｜圖鑑 OK' : `｜圖鑑失敗 HTTP ${r.status}`;
+        })
+        .catch(() => { status.textContent += '｜圖鑑失敗'; });
+    }
   });
   wipe.addEventListener('click', () => {
     const url = epInput.value.trim();
@@ -4302,6 +4630,8 @@ function openCloudConfig() {
   sec.appendChild(title);
   sec.appendChild(epInput);
   sec.appendChild(authInput);
+  sec.appendChild(unlockEpInput);
+  sec.appendChild(unlockAuthInput);
   sec.appendChild(status);
   sec.appendChild(actions);
 }
@@ -4397,6 +4727,7 @@ function resetGlobalState() {
   cloudSyncDisabled = false;
   isGameOver = false;
   mismatchCounter = 0;
+  guestUnlockedIllustrations = new Set();
 }
 
 function isAccountBound() {
@@ -4466,9 +4797,7 @@ function openAuthGate() {
   accountBtn.className = 'button';
   accountBtn.type = 'button';
   accountBtn.textContent = '註冊 / 登入';
-  accountBtn.addEventListener('click', () => {
-    showBlockModal('功能開發中', [ { text: '帳號登入 / 註冊尚未開放' } ]);
-  });
+  accountBtn.addEventListener('click', openAccountDialog);
   const guestBtn = document.createElement('button');
   guestBtn.className = 'button';
   guestBtn.type = 'button';
