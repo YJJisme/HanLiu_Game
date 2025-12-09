@@ -2786,6 +2786,15 @@ function openSettings() {
       setTimeout(() => { start(); }, 0);
     });
   });
+  const toLogin = document.createElement('button');
+  toLogin.className = 'button';
+  toLogin.type = 'button';
+  toLogin.textContent = '返回登入頁';
+  toLogin.addEventListener('click', () => {
+    blockingModalOpen = false;
+    try { document.body.removeChild(overlay); } catch {}
+    openAuthGate();
+  });
   const notice = document.createElement('button');
   notice.className = 'button';
   notice.type = 'button';
@@ -2823,6 +2832,7 @@ function openSettings() {
     actions.appendChild(restart);
   }
   actions.appendChild(notice);
+  if (preLogin) actions.appendChild(toLogin);
   if (isAccountBound()) actions.appendChild(logout);
   if (isAdminEnabled()) actions.appendChild(cloud);
   actions.appendChild(about);
