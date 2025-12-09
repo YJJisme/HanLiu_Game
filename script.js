@@ -19,10 +19,10 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.3.0';
+let appVersion = '1.21';
 let releaseNotes = ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'];
 let releaseHistory = {
-  '1.3.0': ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'],
+  '1.21': ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'],
   '1.2.0': [
     '新增登入選擇入口與隱私導向本機帳號',
     '首頁登入按鈕響應式（橫排/直排）與定位優化',
@@ -4690,7 +4690,7 @@ function setStoredAccount(acc) {
   try { localStorage.setItem('hanliu_account_name', String(acc && acc.name || '')); } catch {}
 }
 function openAccountDialog() {
-  if (document.querySelector('.modal-backdrop.active-block')) return;
+  try { Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } }); } catch {}
   const overlay = document.createElement('div');
   overlay.className = 'modal-backdrop active-block';
   const modal = document.createElement('div');
