@@ -19,9 +19,10 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.2.0';
-let releaseNotes = ['結算頁加入分享結果按鈕','生成分享圖片（暱稱/分數/評語）','支援 Web Share；回退提供下載與複製','依評級自動匹配結算插圖'];
+let appVersion = '1.3.0';
+let releaseNotes = ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'];
 let releaseHistory = {
+  '1.3.0': ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'],
   '1.2.0': [
     '新增登入選擇入口與隱私導向本機帳號',
     '首頁登入按鈕響應式（橫排/直排）與定位優化',
@@ -385,7 +386,13 @@ function finalizeGame() {
   const playerName = localStorage.getItem('hanliu_player_name') || '無名';
   const route = currentRoute || 'HanYu';
   const rk = computeRank(matchScore, orderFailed);
-  if (rk && rk.level !== 'E') { currentProgress = 'Completed'; }
+  if (!orderFailed) {
+    const atEnd = Array.isArray(gameFlow) ? (currentLevelIndex >= gameFlow.length) : false;
+    if (atEnd || currentProgress === 'Review') { currentProgress = 'Completed'; }
+  } else {
+    if (currentProgress === 'Review') currentProgress = 'Failed at Review';
+    // 保留先前的失敗文字，例如 Number 關卡的 "Failed at Level X"
+  }
   if (route === 'HanYu' && rk && rk.level === 'SS') {
     saveScore(playerName, matchScore, route);
     showBlockModal('傳說', [
@@ -2789,6 +2796,21 @@ function openSettings() {
   cloud.type = 'button';
   cloud.textContent = '雲端設定';
   cloud.addEventListener('click', () => { blockingModalOpen = false; try { document.body.removeChild(overlay); } catch {} openCloudConfig(); });
+  const logout = document.createElement('button');
+  logout.className = 'button';
+  logout.type = 'button';
+  logout.textContent = '登出';
+  logout.addEventListener('click', () => {
+    const doLogout = () => {
+      setActiveAccountId('');
+      try { localStorage.removeItem('hanliu_account_name'); } catch {}
+      applyPlayerNameInputState();
+      blockingModalOpen = false;
+      try { document.body.removeChild(overlay); } catch {}
+      openAuthGate();
+    };
+    showConfirmModal('登出', '將登出目前帳號，之後可在「註冊 / 登入」再次登入。確定嗎？', '確定', doLogout);
+  });
   const about = document.createElement('button');
   about.className = 'button';
   about.type = 'button';
@@ -2801,6 +2823,7 @@ function openSettings() {
     actions.appendChild(restart);
   }
   actions.appendChild(notice);
+  if (isAccountBound()) actions.appendChild(logout);
   if (isAdminEnabled()) actions.appendChild(cloud);
   actions.appendChild(about);
   modal.appendChild(close);
@@ -4183,6 +4206,8 @@ document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba
     const pv = (sp.get('preview') || '').toLowerCase();
     const sc = parseInt(sp.get('score') || '', 10);
     const multi = (sp.get('scores') || '').split(',').map(x => parseInt(x.trim(), 10)).filter(x => !isNaN(x));
+    const fl = String(sp.get('force_login') || '').trim().toLowerCase();
+    if (fl === '1' || fl === 'true') { try { openAuthGate(); } catch {} }
     if (pv === 'ss' || (!isNaN(sc) && sc >= 0)) {
       cloudSyncDisabled = true;
       const demoScore = pv === 'ss' ? 301 : Math.max(0, sc);
@@ -4436,9 +4461,9 @@ function dismissAuthGateToHome() {
   if (startScreen) startScreen.style.display = '';
   const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
   applyPlayerNameInputState();
-  const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = false;
-  const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = false;
-  const hsv2 = document.getElementById('homeSfxVolume'); if (hsv2) hsv2.hidden = false;
+  const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = true;
+  const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = true;
+  const hsv2 = document.getElementById('homeSfxVolume'); if (hsv2) hsv2.hidden = true;
   const inputEl = document.getElementById('playerName');
   try { if (inputEl) inputEl.focus(); } catch {}
 }
@@ -4674,7 +4699,8 @@ function openAccountDialog() {
   close.className = 'modal-close';
   close.type = 'button';
   close.textContent = '×';
-  close.addEventListener('click', () => { blockingModalOpen = false; document.body.removeChild(overlay); });
+  const sbtnHide = document.getElementById('settingsBtn'); if (sbtnHide) sbtnHide.hidden = true;
+  close.addEventListener('click', () => { blockingModalOpen = false; document.body.removeChild(overlay); const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false; });
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '註冊 / 登入';
@@ -4763,6 +4789,7 @@ function openAccountDialog() {
     applyPlayerNameInputState();
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
+    const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false;
     dismissAuthGateToHome();
   });
   loginBtn.addEventListener('click', async () => {
@@ -4782,6 +4809,7 @@ function openAccountDialog() {
     applyPlayerNameInputState();
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
+    const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false;
     dismissAuthGateToHome();
   });
   deleteBtn.addEventListener('click', async () => {
@@ -4800,6 +4828,7 @@ function openAccountDialog() {
     status.textContent = '已註銷';
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
+    const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false;
     openAuthGate();
   });
   modal.appendChild(close);
@@ -4838,6 +4867,7 @@ function openCloudConfig() {
     main.appendChild(sec);
   }
   sec.innerHTML = '';
+  const sbtnHide = document.getElementById('settingsBtn'); if (sbtnHide) sbtnHide.hidden = true;
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '雲端排行榜設定';
@@ -4891,6 +4921,26 @@ function openCloudConfig() {
   close.className = 'button';
   close.type = 'button';
   close.textContent = '返回首頁';
+  const runExtraTests = () => {
+    const uurl = unlockEpInput.value.trim();
+    if (uurl) {
+      fetch(uurl, { headers: { ...(unlockAuthInput.value.trim() ? { authorization: unlockAuthInput.value.trim() } : {}) } })
+        .then(async (r) => {
+          const ok = r.ok;
+          status.textContent += ok ? '｜圖鑑 OK' : `｜圖鑑失敗 HTTP ${r.status}`;
+        })
+        .catch(() => { status.textContent += '｜圖鑑失敗'; });
+    }
+    const aurl = accEpInput.value.trim();
+    if (aurl) {
+      fetch(aurl, { headers: { ...(accAuthInput.value.trim() ? { authorization: accAuthInput.value.trim() } : {}) } })
+        .then(async (r) => {
+          const ok = r.ok;
+          status.textContent += ok ? '｜帳號 OK' : `｜帳號失敗 HTTP ${r.status}`;
+        })
+        .catch(() => { status.textContent += '｜帳號失敗'; });
+    }
+  };
   save.addEventListener('click', () => {
     try { localStorage.setItem('hanliu_cloud_endpoint', epInput.value.trim()); } catch {}
     try { if (authInput.value.trim()) localStorage.setItem('hanliu_cloud_auth', authInput.value.trim()); else localStorage.removeItem('hanliu_cloud_auth'); } catch {}
@@ -4915,25 +4965,12 @@ function openCloudConfig() {
         if (Array.isArray(data)) status.textContent = `連線成功，共有 ${data.length} 筆資料`;
         else status.textContent = '連線成功';
       })
-      .catch((err) => { status.textContent = `連線失敗：${String(err && err.message || err)}`; });
-    const uurl = unlockEpInput.value.trim();
-    if (uurl) {
-      fetch(uurl, { headers: { ...(unlockAuthInput.value.trim() ? { authorization: unlockAuthInput.value.trim() } : {}) } })
-        .then(async (r) => {
-          const ok = r.ok;
-          status.textContent += ok ? '｜圖鑑 OK' : `｜圖鑑失敗 HTTP ${r.status}`;
-        })
-        .catch(() => { status.textContent += '｜圖鑑失敗'; });
-    }
-    const aurl = accEpInput.value.trim();
-    if (aurl) {
-      fetch(aurl, { headers: { ...(accAuthInput.value.trim() ? { authorization: accAuthInput.value.trim() } : {}) } })
-        .then(async (r) => {
-          const ok = r.ok;
-          status.textContent += ok ? '｜帳號 OK' : `｜帳號失敗 HTTP ${r.status}`;
-        })
-        .catch(() => { status.textContent += '｜帳號失敗'; });
-    }
+      .catch((err) => { status.textContent = `連線失敗：${String(err && err.message || err)}`; })
+      .finally(() => { runExtraTests(); });
+  });
+  close.addEventListener('click', () => {
+    navigateHome();
+    const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false;
   });
   wipe.addEventListener('click', () => {
     const url = epInput.value.trim();
@@ -4986,9 +5023,7 @@ if (homeSfxVol) {
   });
 }
 const homeVolToggle = document.getElementById('homeVolumeToggle');
-if (homeVolToggle) {
-  homeVolToggle.addEventListener('click', openHomeVolumeModal);
-}
+if (homeVolToggle) { homeVolToggle.hidden = true; }
 
 function openHomeVolumeModal() {
   const existing = document.getElementById('homeVolumeBackdrop');
