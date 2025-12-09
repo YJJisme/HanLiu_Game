@@ -2871,6 +2871,7 @@ function saveScore(name, score, route) {
 
 function displayLeaderboard(filterRoute, skipRemote) {
   if (!skipRemote && getCloudEndpoint()) {
+    const fallback = () => { try { displayLeaderboard(filterRoute, true); } catch {} };
     try {
       fetch(getCloudEndpoint(), { headers: { ...(getCloudAuth() ? { authorization: getCloudAuth() } : {}) } })
         .then(r => r.json())
@@ -2883,10 +2884,10 @@ function displayLeaderboard(filterRoute, skipRemote) {
             const merged = dedupeRecords(arr.concat(remote));
             localStorage.setItem(key, JSON.stringify(merged));
           }
-          displayLeaderboard(filterRoute, true);
+          fallback();
         })
-        .catch(() => {});
-    } catch {}
+        .catch(() => { fallback(); });
+    } catch { fallback(); }
     return;
   }
   const key = 'hanliu_scores';
@@ -4641,7 +4642,7 @@ function openAccountDialog() {
     status.textContent = '已註銷';
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
-    dismissAuthGateToHome();
+    openAuthGate();
   });
   modal.appendChild(close);
   modal.appendChild(title);
