@@ -1211,6 +1211,25 @@ function startEpitaphLevel() {
 
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
+  const accountSelect = document.createElement('select');
+  accountSelect.className = 'input';
+  const fillAccountSelect = () => {
+    const list = loadAccountsList();
+    accountSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = list && list.length ? '選擇已註冊帳號' : '目前沒有帳號';
+    accountSelect.appendChild(placeholder);
+    const activeId = getActiveAccountId();
+    (list || []).forEach((a) => {
+      const opt = document.createElement('option');
+      opt.value = String(a.id);
+      opt.textContent = String(a.name || a.id);
+      if (activeId && String(a.id) === activeId) opt.selected = true;
+      accountSelect.appendChild(opt);
+    });
+  };
+  fillAccountSelect();
   const checkBtn = document.createElement('button');
   checkBtn.className = 'button';
   checkBtn.type = 'button';
@@ -2782,7 +2801,7 @@ function openSettings() {
     actions.appendChild(restart);
   }
   actions.appendChild(notice);
-  actions.appendChild(cloud);
+  if (isAdminEnabled()) actions.appendChild(cloud);
   actions.appendChild(about);
   modal.appendChild(close);
   modal.appendChild(title);
@@ -2877,7 +2896,8 @@ function saveScore(name, score, route) {
   try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
   const now = Date.now();
   const totalSeconds = startTime ? Math.max(0, Math.floor((now - startTime) / 1000)) : 0;
-  const rec = { id: genRecordId(), name, score, route, time: totalSeconds, progress: currentProgress, ts: now };
+  const acc = isAccountBound() ? getStoredAccount() : null;
+  const rec = { id: genRecordId(), name: acc && acc.name ? acc.name : name, score, route, time: totalSeconds, progress: currentProgress, ts: now, ...(acc && acc.id ? { accountId: acc.id } : {}) };
   lastRunId = rec.id;
   arr.push(rec);
   localStorage.setItem(key, JSON.stringify(dedupeRecords(arr)));
@@ -2890,6 +2910,18 @@ function saveScore(name, score, route) {
       }).catch(() => {});
     } catch {}
   }
+}
+
+function updateStoredScoresNameForAccount(accId, nm) {
+  const key = 'hanliu_scores';
+  const raw = localStorage.getItem(key);
+  let arr = [];
+  try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
+  const out = (arr || []).map((r) => {
+    if (r && String(r.accountId || '') === String(accId)) return { ...r, name: nm };
+    return r;
+  });
+  try { localStorage.setItem(key, JSON.stringify(out)); } catch {}
 }
 
 function displayLeaderboard(filterRoute, skipRemote) {
@@ -2907,6 +2939,31 @@ function displayLeaderboard(filterRoute, skipRemote) {
             const merged = dedupeRecords(arr.concat(remote));
             localStorage.setItem(key, JSON.stringify(merged));
           }
+          const accEp = getAccountEndpoint();
+          const accAu = getAccountAuth();
+          if (accEp) {
+            fetch(accEp, { headers: { ...(accAu ? { authorization: accAu } : {}) } })
+              .then(r => r.json())
+              .then((accounts) => {
+                if (Array.isArray(accounts)) {
+                  const local = loadAccountsList();
+                  const byId = new Map();
+                  local.forEach((a) => { const id = String(a && a.id || ''); if (id) byId.set(id, a); });
+                  accounts.forEach((a) => {
+                    const id = String(a && a.id || '');
+                    if (!id) return;
+                    const cur = byId.get(id);
+                    if (!cur || Number(a.ts || 0) > Number(cur.ts || 0)) byId.set(id, a);
+                  });
+                  const merged = [];
+                  byId.forEach((v) => { merged.push(v); });
+                  saveAccountsList(merged);
+                }
+              })
+              .catch(() => {})
+              .finally(() => { fallback(); });
+            return;
+          }
           fallback();
         })
         .catch(() => { fallback(); });
@@ -2919,6 +2976,8 @@ function displayLeaderboard(filterRoute, skipRemote) {
   try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
   let list = arr;
   if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
+  const accMap = (() => { const m = new Map(); (loadAccountsList() || []).forEach(a => { const id = String(a && a.id || ''); const nm = String(a && a.name || '').trim(); if (id && nm) m.set(id, nm); }); return m; })();
+  list = (list || []).map((r) => { if (r && r.accountId && accMap.has(String(r.accountId))) return { ...r, name: accMap.get(String(r.accountId)) }; return r; });
   list = selectBestPerName(list);
   list.sort((a, b) => b.score - a.score);
   list = list.slice(0, 100);
@@ -4351,6 +4410,7 @@ function removeAccountUnlocksLocal(accId) {
 function clearLocalAccount() {
   try { localStorage.removeItem('hanliu_account'); } catch {}
   try { localStorage.removeItem('hanliu_account_name'); } catch {}
+  try { localStorage.removeItem('hanliu_active_account_id'); } catch {}
 }
 async function loadAccountFromCloud(name) {
   const ep = getAccountEndpoint();
@@ -4557,11 +4617,52 @@ function genSaltB64() {
   let s = ''; for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
   return btoa(s);
 }
+function loadAccountsList() {
+  try { const raw = localStorage.getItem('hanliu_accounts'); return raw ? JSON.parse(raw) : []; } catch { return []; }
+}
+function saveAccountsList(list) {
+  try { localStorage.setItem('hanliu_accounts', JSON.stringify(Array.isArray(list) ? list : [])); } catch {}
+}
+function getActiveAccountId() {
+  try { return String(localStorage.getItem('hanliu_active_account_id') || '').trim(); } catch { return ''; }
+}
+function setActiveAccountId(id) {
+  try { if (id) localStorage.setItem('hanliu_active_account_id', String(id)); else localStorage.removeItem('hanliu_active_account_id'); } catch {}
+}
+function migrateLegacyAccount() {
+  try {
+    const raw = localStorage.getItem('hanliu_account');
+    const acc = raw ? JSON.parse(raw) : null;
+    if (acc && acc.id) {
+      let list = loadAccountsList();
+      const exists = list.some(a => String(a && a.id || '') === String(acc.id));
+      if (!exists) { list.push(acc); saveAccountsList(list); }
+      setActiveAccountId(acc.id);
+      localStorage.removeItem('hanliu_account');
+    }
+  } catch {}
+}
 function getStoredAccount() {
-  try { const raw = localStorage.getItem('hanliu_account'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  migrateLegacyAccount();
+  const list = loadAccountsList();
+  let id = getActiveAccountId();
+  if (!id && Array.isArray(list) && list.length) id = String(list[0] && list[0].id || '');
+  if (!id) return null;
+  const acc = list.find(a => String(a && a.id || '') === String(id));
+  return acc || null;
 }
 function setStoredAccount(acc) {
-  try { localStorage.setItem('hanliu_account', JSON.stringify(acc)); localStorage.setItem('hanliu_account_name', String(acc && acc.name || '')); } catch {}
+  if (!acc || !acc.id) return;
+  let list = loadAccountsList();
+  let found = false;
+  list = (list || []).map((a) => {
+    if (String(a && a.id || '') === String(acc.id)) { found = true; return acc; }
+    return a;
+  });
+  if (!found) list.push(acc);
+  saveAccountsList(list);
+  setActiveAccountId(acc.id);
+  try { localStorage.setItem('hanliu_account_name', String(acc && acc.name || '')); } catch {}
 }
 function openAccountDialog() {
   if (document.querySelector('.modal-backdrop.active-block')) return;
@@ -4611,10 +4712,43 @@ function openAccountDialog() {
   deleteBtn.textContent = '註銷帳號';
   const applyNameState = () => {
     const acc = getStoredAccount();
-    if (acc && acc.name) { nameInput.value = acc.name; nameInput.readOnly = true; nameInput.disabled = true; } else { nameInput.readOnly = false; nameInput.disabled = false; }
+    if (acc && acc.name) { nameInput.value = acc.name; }
+    nameInput.readOnly = false; nameInput.disabled = false;
     deleteBtn.disabled = !(acc && acc.id);
   };
   applyNameState();
+  const switchBtn = document.createElement('button');
+  switchBtn.className = 'button';
+  switchBtn.type = 'button';
+  switchBtn.textContent = '切換帳號';
+  switchBtn.addEventListener('click', () => {
+    const id = String(accountSelect.value || '').trim();
+    if (!id) { status.textContent = '請先選擇帳號'; return; }
+    const list = loadAccountsList();
+    const acc = (list || []).find(a => String(a && a.id || '') === id);
+    if (!acc) { status.textContent = '找不到帳號'; return; }
+    setStoredAccount(acc);
+    applyPlayerNameInputState();
+    status.textContent = `已切換為：${String(acc.name || '')}`;
+    fillAccountSelect();
+  });
+  const renameBtn = document.createElement('button');
+  renameBtn.className = 'button';
+  renameBtn.type = 'button';
+  renameBtn.textContent = '修改暱稱';
+  renameBtn.addEventListener('click', async () => {
+    const acc = getStoredAccount();
+    if (!acc || !acc.salt || !acc.hash) { status.textContent = '請先登入綁定帳號'; return; }
+    const nm = String(prompt('輸入新的暱稱（2–16 個字）', acc.name) || '').trim();
+    if (nm.length < 2 || nm.length > 16) { status.textContent = '暱稱需介於 2–16 字'; return; }
+    const next = { ...acc, name: nm, ts: Date.now() };
+    setStoredAccount(next);
+    try { await syncAccountToCloud(next); } catch {}
+    try { updateStoredScoresNameForAccount(next.id, nm); } catch {}
+    applyPlayerNameInputState();
+    status.textContent = '暱稱已更新';
+    fillAccountSelect();
+  });
   registerBtn.addEventListener('click', async () => {
     const nm = String(nameInput.value || '').trim();
     const pw = String(passInput.value || '').trim();
@@ -4632,13 +4766,13 @@ function openAccountDialog() {
     dismissAuthGateToHome();
   });
   loginBtn.addEventListener('click', async () => {
-    let acc = getStoredAccount();
-    if (!acc || !acc.salt || !acc.hash) {
-      const nm = String(nameInput.value || '').trim();
-      acc = await loadAccountFromCloud(nm).catch(() => null);
-      if (!acc || !acc.salt || !acc.hash) { status.textContent = '尚未註冊'; return; }
-      setStoredAccount(acc);
-    }
+    const nm = String(nameInput.value || '').trim();
+    let acc = null;
+    const list = loadAccountsList();
+    if (nm) acc = (list || []).find(a => String(a && a.name || '') === nm) || null;
+    if (!acc) acc = await loadAccountFromCloud(nm).catch(() => null);
+    if (!acc || !acc.salt || !acc.hash) { status.textContent = '尚未註冊'; return; }
+    setStoredAccount(acc);
     const pw = String(passInput.value || '').trim();
     if (!pw) { status.textContent = '請輸入密碼'; return; }
     const h = await deriveAccountHash(pw, acc.salt).catch(() => '');
@@ -4672,10 +4806,13 @@ function openAccountDialog() {
   modal.appendChild(title);
   modal.appendChild(status);
   modal.appendChild(content);
+  content.appendChild(accountSelect);
   content.appendChild(nameLabel);
   content.appendChild(nameInput);
   content.appendChild(passLabel);
   content.appendChild(passInput);
+  actions.appendChild(switchBtn);
+  actions.appendChild(renameBtn);
   actions.appendChild(registerBtn);
   actions.appendChild(loginBtn);
   actions.appendChild(deleteBtn);
@@ -4948,6 +5085,16 @@ function applyPlayerNameInputState() {
     el.disabled = false;
     if (!el.value) el.placeholder = '輸入名字';
   }
+}
+
+function isAdminEnabled() {
+  try {
+    const sp = new URLSearchParams(location.search);
+    const q = String(sp.get('admin') || '').trim().toLowerCase();
+    if (q === '1' || q === 'true') return true;
+  } catch {}
+  try { if (typeof devModeEnabled !== 'undefined' && !!devModeEnabled) return true; } catch {}
+  return false;
 }
 
 function isPreLogin() {
