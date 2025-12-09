@@ -59,7 +59,7 @@ let customNumberFailText = null;
 let mismatchCounter = 0;
 let bgmAudio = null;
 let bgmEnabled = true;
-let bgmVolume = 0.35;
+let bgmVolume = 0.0;
 let audioCtx = null;
 let sfxEnabled = true;
 let sfxVolume = 0.6;
@@ -383,9 +383,9 @@ function finalizeGame() {
     blockingModalOpen = false;
   } catch {}
   const playerName = localStorage.getItem('hanliu_player_name') || '無名';
-  currentProgress = 'Completed';
   const route = currentRoute || 'HanYu';
   const rk = computeRank(matchScore, orderFailed);
+  if (rk && rk.level !== 'E') { currentProgress = 'Completed'; }
   if (route === 'HanYu' && rk && rk.level === 'SS') {
     saveScore(playerName, matchScore, route);
     showBlockModal('傳說', [
@@ -2459,6 +2459,7 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
     let list = arr;
     if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
+    list = selectBestPerName(list);
     list.sort((a, b) => b.score - a.score);
     const main = document.querySelector('main.container');
     if (main) { main.style.alignItems = 'flex-start'; main.style.justifyItems = 'center'; main.scrollTop = 0; }
@@ -2471,9 +2472,10 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     info.textContent = headingText || '';
     const curRank = computeRank(matchScore, orderFailed);
     const curIndex = list.findIndex(r => String(r && r.id || '') === String(lastRunId || ''));
+    const pos = 1 + list.filter(r => Number(r && r.score || 0) > Number(matchScore || 0)).length;
     const rankInfo = document.createElement('p');
     rankInfo.className = 'dialog-text';
-    rankInfo.textContent = curIndex >= 0 ? `本次名次：第${curIndex + 1} 名` : '';
+    rankInfo.textContent = `本次名次：第${curIndex >= 0 ? (curIndex + 1) : pos} 名`;
     if (curRank.level === 'E') {
       document.documentElement.style.setProperty('--bg', '#000000');
     }
@@ -2608,7 +2610,7 @@ function navigateHome() {
   resetGlobalState();
   systemCleanup(false);
   applyPlayerNameInputState();
-  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
+  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
   const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = false;
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = false;
   const hv = document.getElementById('homeVolume'); if (hv) { hv.classList.remove('is-visible'); hv.hidden = true; hv.value = String(Math.round((getStoredVolume() || 0.35) * 100)); }
@@ -2707,7 +2709,7 @@ function openSettings() {
   volSlider.type = 'range';
   volSlider.min = '0';
   volSlider.max = '100';
-  volSlider.value = String(Math.round((bgmVolume || 0.35) * 100));
+  volSlider.value = String(Math.round(bgmVolume * 100));
   volSlider.addEventListener('input', () => {
     const val = Math.max(0, Math.min(100, parseInt(volSlider.value, 10) || 0));
     const nv = val / 100;
@@ -2763,6 +2765,11 @@ function openSettings() {
   notice.type = 'button';
   notice.textContent = '公告';
   notice.addEventListener('click', () => { openNotice(); });
+  const cloud = document.createElement('button');
+  cloud.className = 'button';
+  cloud.type = 'button';
+  cloud.textContent = '雲端設定';
+  cloud.addEventListener('click', () => { blockingModalOpen = false; try { document.body.removeChild(overlay); } catch {} openCloudConfig(); });
   const about = document.createElement('button');
   about.className = 'button';
   about.type = 'button';
@@ -2775,6 +2782,7 @@ function openSettings() {
     actions.appendChild(restart);
   }
   actions.appendChild(notice);
+  actions.appendChild(cloud);
   actions.appendChild(about);
   modal.appendChild(close);
   modal.appendChild(title);
@@ -2847,6 +2855,21 @@ function dedupeRecords(list) {
   byBase.forEach((v) => { out.push(v); });
   return out;
 }
+function selectBestPerName(list) {
+  const m = new Map();
+  (list || []).forEach((r) => {
+    const nm = String(r && r.name || '').trim();
+    const sc = Number(r && r.score || 0);
+    const ts = Number(r && r.ts || 0);
+    const cur = m.get(nm);
+    if (!cur || sc > Number(cur && cur.score || 0) || (sc === Number(cur && cur.score || 0) && ts > Number(cur && cur.ts || 0))) {
+      m.set(nm, r);
+    }
+  });
+  const out = [];
+  m.forEach((v) => { out.push(v); });
+  return out;
+}
 function saveScore(name, score, route) {
   const key = 'hanliu_scores';
   const raw = localStorage.getItem(key);
@@ -2896,6 +2919,7 @@ function displayLeaderboard(filterRoute, skipRemote) {
   try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
   let list = arr;
   if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
+  list = selectBestPerName(list);
   list.sort((a, b) => b.score - a.score);
   list = list.slice(0, 100);
   const content = document.getElementById('leaderboardContent');
@@ -4804,7 +4828,7 @@ function openCloudConfig() {
 const homeVol = document.getElementById('homeVolume');
 if (homeVol) {
   homeVol.hidden = true;
-  homeVol.value = String(Math.round((getStoredVolume() || 0.35) * 100));
+  homeVol.value = String(Math.round(getStoredVolume() * 100));
   homeVol.addEventListener('input', () => {
     const val = Math.max(0, Math.min(100, parseInt(homeVol.value, 10) || 0));
     const nv = val / 100;
@@ -4816,7 +4840,7 @@ if (homeVol) {
 const homeSfxVol = document.getElementById('homeSfxVolume');
 if (homeSfxVol) {
   homeSfxVol.hidden = true;
-  homeSfxVol.value = String(Math.round((getStoredSfxVolume() || 0.6) * 100));
+  homeSfxVol.value = String(Math.round(getStoredSfxVolume() * 100));
   homeSfxVol.addEventListener('input', () => {
     const val = Math.max(0, Math.min(100, parseInt(homeSfxVol.value, 10) || 0));
     const nv = val / 100;
@@ -4849,7 +4873,7 @@ function openHomeVolumeModal() {
   volSlider.type = 'range';
   volSlider.min = '0';
   volSlider.max = '100';
-  volSlider.value = String(Math.round((getStoredVolume() || bgmVolume || 0.35) * 100));
+  volSlider.value = String(Math.round(getStoredVolume() * 100));
   volSlider.addEventListener('input', () => {
     const val = Math.max(0, Math.min(100, parseInt(volSlider.value, 10) || 0));
     const nv = val / 100;
@@ -4864,7 +4888,7 @@ function openHomeVolumeModal() {
   sfxSlider.type = 'range';
   sfxSlider.min = '0';
   sfxSlider.max = '100';
-  sfxSlider.value = String(Math.round((getStoredSfxVolume() || sfxVolume || 0.6) * 100));
+  sfxSlider.value = String(Math.round(getStoredSfxVolume() * 100));
   sfxSlider.addEventListener('input', () => {
     const val = Math.max(0, Math.min(100, parseInt(sfxSlider.value, 10) || 0));
     const nv = val / 100;
@@ -4978,12 +5002,13 @@ function openAuthGate() {
   guestBtn.type = 'button';
   guestBtn.textContent = '以遊客進入';
   guestBtn.addEventListener('click', () => {
+    clearLocalAccount();
     document.documentElement.style.setProperty('--bg-image', "url('home.png')");
     document.documentElement.style.setProperty('--bg-overlay', 'none');
     const gateActions = document.getElementById('authGateActions');
     if (gateActions) { try { main.removeChild(gateActions); } catch {} }
     if (startScreen) startScreen.style.display = '';
-    const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
+    const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
     applyPlayerNameInputState();
     const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = false;
     const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = false;
