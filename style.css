@@ -101,6 +101,7 @@ body {
   display: grid;
   place-items: center;
   padding: 2rem;
+  z-index: 1001;
 }
 
 .modal-backdrop[hidden] { display: none !important; }
