@@ -5153,6 +5153,7 @@ function isPreLogin() {
 function openAuthGate() {
   const main = document.querySelector('main.container');
   if (!main) return;
+  try { Array.from(document.querySelectorAll('.modal-backdrop')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } }); } catch {}
   const startScreen = document.getElementById('startScreen');
   if (startScreen) startScreen.style.display = 'none';
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
@@ -5178,6 +5179,7 @@ function openAuthGate() {
   actions.style.transform = 'translateX(-50%)';
   actions.style.bottom = '12vh';
   actions.style.flexWrap = 'wrap';
+  actions.style.zIndex = '1000';
   const applyAuthGateLayout = () => {
     const narrow = window.innerWidth < 560;
     actions.style.flexDirection = narrow ? 'column' : 'row';
@@ -5188,7 +5190,7 @@ function openAuthGate() {
   accountBtn.className = 'button';
   accountBtn.type = 'button';
   accountBtn.textContent = '註冊 / 登入';
-  accountBtn.addEventListener('click', openAccountDialog);
+  accountBtn.addEventListener('click', () => { setTimeout(() => { try { openAccountDialog(); } catch {} }, 0); });
   const guestBtn = document.createElement('button');
   guestBtn.className = 'button';
   guestBtn.type = 'button';
