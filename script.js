@@ -1886,7 +1886,10 @@ function startDreamLevel() {
   const rare = Math.floor(Math.random() * 1000) + 1;
   if (rare === 1) {
     bumpScore(10);
-    showBlockModal('一覺好眠', [{ text: '你做了一場好夢，精神飽滿：+10 分' }], () => { sec.remove(); goToNextLevel(); });
+    const ver = getCharacterVersion();
+    const imgKey = ver === 'youth' ? 'han_yu_youth_sleep.png' : ver === 'middle' ? 'han_yu_middle_sleep.png' : 'han_yu_aged_sleep.png';
+    const items = imgKey ? [{ image: imgKey, text: '你做了一場好夢，精神飽滿：+10 分' }] : [{ text: '你做了一場好夢，精神飽滿：+10 分' }];
+    showBlockModal('一覺好眠', items, () => { sec.remove(); goToNextLevel(); });
     return;
   }
   const qs = sampleQuestions(dreamQuestionBank, 1)[0];
@@ -4489,6 +4492,7 @@ function dismissAuthGateToHome() {
   if (gateActions && main) { try { main.removeChild(gateActions); } catch {} }
   if (startScreen) startScreen.style.display = '';
   const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
+  try { if (window.__authGateResizeHandler) { window.removeEventListener('resize', window.__authGateResizeHandler); window.__authGateResizeHandler = null; } } catch {}
   applyPlayerNameInputState();
   const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = true;
   const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = true;
@@ -4536,7 +4540,15 @@ function getIllustrationList() {
   return [
     'hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png',
     'han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png',
+    'han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png',
     'han_yu_immortal.png','luliang.png','mengjiao_moon.png','Mansion.png'
+  ];
+}
+function getIllustrationGroups() {
+  return [
+    { title: '結算', items: ['hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png'] },
+    { title: '場景', items: ['luliang.png','Mansion.png'] },
+    { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_immortal.png','mengjiao_moon.png'] },
   ];
 }
 function loadAccountUnlocks() {
@@ -4590,57 +4602,63 @@ async function openGallery() {
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '圖鑑';
-  const grid = document.createElement('div');
-  grid.style.display = 'grid';
-  grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(160px, 1fr))';
-  grid.style.gap = '0.75rem';
   const unlocked = getCurrentUnlocksSet();
-  const all = getIllustrationList();
-  all.forEach((key) => {
-    const cell = document.createElement('div');
-    cell.style.display = 'flex';
-    cell.style.flexDirection = 'column';
-    cell.style.alignItems = 'center';
-    cell.style.justifyContent = 'center';
-    cell.style.padding = '0.5rem';
-    cell.style.border = '1px solid #2a2a2a';
-    cell.style.borderRadius = '10px';
-    cell.style.minHeight = '180px';
-    const label = document.createElement('span');
-    label.className = 'dialog-text';
-    label.textContent = key;
-    label.style.fontSize = '0.95rem';
-    label.style.marginTop = '0.5rem';
-    if (unlocked.has(key)) {
-      const img = document.createElement('img');
-      img.className = 'illustration';
-      img.src = key;
-      img.alt = key;
-      img.style.width = 'min(140px, 38vw)';
-      img.style.maxHeight = '120px';
-      img.style.objectFit = 'contain';
-      cell.appendChild(img);
-      cell.appendChild(label);
-    } else {
-      const lock = document.createElement('div');
-      lock.textContent = '已鎖定';
-      lock.style.width = 'min(140px, 38vw)';
-      lock.style.maxHeight = '120px';
-      lock.style.display = 'flex';
-      lock.style.alignItems = 'center';
-      lock.style.justifyContent = 'center';
-      lock.style.background = 'linear-gradient(135deg, rgba(90,90,90,0.35), rgba(40,40,40,0.35))';
-      lock.style.border = '1px dashed #555';
-      lock.style.borderRadius = '10px';
-      lock.style.color = '#9aa0a6';
-      cell.appendChild(lock);
-      cell.appendChild(label);
-    }
-    grid.appendChild(cell);
-  });
+  const groups = getIllustrationGroups();
   modal.appendChild(close);
   modal.appendChild(title);
-  modal.appendChild(grid);
+  groups.forEach((group) => {
+    const gh = document.createElement('p');
+    gh.className = 'dialog-text';
+    gh.textContent = group.title;
+    modal.appendChild(gh);
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(160px, 1fr))';
+    grid.style.gap = '0.75rem';
+    (group.items || []).forEach((key) => {
+      const cell = document.createElement('div');
+      cell.style.display = 'flex';
+      cell.style.flexDirection = 'column';
+      cell.style.alignItems = 'center';
+      cell.style.justifyContent = 'center';
+      cell.style.padding = '0.5rem';
+      cell.style.border = '1px solid #2a2a2a';
+      cell.style.borderRadius = '10px';
+      cell.style.minHeight = '180px';
+      const label = document.createElement('span');
+      label.className = 'dialog-text';
+      label.textContent = key;
+      label.style.fontSize = '0.95rem';
+      label.style.marginTop = '0.5rem';
+      if (unlocked.has(key)) {
+        const img = document.createElement('img');
+        img.className = 'illustration';
+        img.src = key;
+        img.alt = key;
+        img.style.width = 'min(140px, 38vw)';
+        img.style.maxHeight = '120px';
+        img.style.objectFit = 'contain';
+        cell.appendChild(img);
+        cell.appendChild(label);
+      } else {
+        const lock = document.createElement('div');
+        lock.textContent = '已鎖定';
+        lock.style.width = 'min(140px, 38vw)';
+        lock.style.maxHeight = '120px';
+        lock.style.display = 'flex';
+        lock.style.alignItems = 'center';
+        lock.style.justifyContent = 'center';
+        lock.style.background = 'linear-gradient(135deg, rgba(90,90,90,0.35), rgba(40,40,40,0.35))';
+        lock.style.border = '1px dashed #555';
+        lock.style.borderRadius = '10px';
+        lock.style.color = '#9aa0a6';
+        cell.appendChild(lock);
+        cell.appendChild(label);
+      }
+      grid.appendChild(cell);
+    });
+    modal.appendChild(grid);
+  });
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 }
@@ -5215,6 +5233,8 @@ function openAuthGate() {
     actions.style.flexDirection = narrow ? 'column' : 'row';
   };
   applyAuthGateLayout();
+  try { if (window.__authGateResizeHandler) window.removeEventListener('resize', window.__authGateResizeHandler); } catch {}
+  window.__authGateResizeHandler = applyAuthGateLayout;
   window.addEventListener('resize', applyAuthGateLayout);
   const accountBtn = document.createElement('button');
   accountBtn.className = 'button';
