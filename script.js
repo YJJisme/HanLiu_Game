@@ -2820,6 +2820,22 @@ function openSettings() {
     };
     showConfirmModal('登出', '將登出目前帳號，之後可在「註冊 / 登入」再次登入。確定嗎？', '確定', doLogout);
   });
+  const rename = document.createElement('button');
+  rename.className = 'button';
+  rename.type = 'button';
+  rename.textContent = '修改暱稱';
+  rename.addEventListener('click', async () => {
+    const acc = getStoredAccount();
+    if (!acc || !acc.salt || !acc.hash) return;
+    const nm = String(prompt('輸入新的暱稱（2–16 個字）', acc.name) || '').trim();
+    if (nm.length < 2 || nm.length > 16) return;
+    const next = { ...acc, name: nm, ts: Date.now() };
+    setStoredAccount(next);
+    try { await syncAccountToCloud(next); } catch {}
+    try { updateStoredScoresNameForAccount(next.id, nm); } catch {}
+    applyPlayerNameInputState();
+    if (isAccountBound()) { const cur = getAccountName(); const label = `暱稱：${cur || nm}`; if (nick) nick.textContent = label; }
+  });
   const about = document.createElement('button');
   about.className = 'button';
   about.type = 'button';
@@ -2834,6 +2850,7 @@ function openSettings() {
   actions.appendChild(notice);
   if (preLogin) actions.appendChild(toLogin);
   if (isAccountBound()) actions.appendChild(logout);
+  if (isAccountBound()) actions.appendChild(rename);
   if (isAdminEnabled()) actions.appendChild(cloud);
   actions.appendChild(about);
   modal.appendChild(close);
@@ -4718,6 +4735,25 @@ function openAccountDialog() {
   status.className = 'dialog-text';
   const content = document.createElement('div');
   content.className = 'actions';
+  const accountSelect = document.createElement('select');
+  accountSelect.className = 'input';
+  const fillAccountSelect = () => {
+    const list = loadAccountsList();
+    accountSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = list && list.length ? '選擇已註冊帳號' : '目前沒有帳號';
+    accountSelect.appendChild(placeholder);
+    const activeId = getActiveAccountId();
+    (list || []).forEach((a) => {
+      const opt = document.createElement('option');
+      opt.value = String(a.id);
+      opt.textContent = String(a.name || a.id);
+      if (activeId && String(a.id) === activeId) opt.selected = true;
+      accountSelect.appendChild(opt);
+    });
+  };
+  fillAccountSelect();
   const nameLabel = document.createElement('span');
   nameLabel.className = 'volume-label';
   nameLabel.textContent = '暱稱：';
@@ -4766,23 +4802,6 @@ function openAccountDialog() {
     setStoredAccount(acc);
     applyPlayerNameInputState();
     status.textContent = `已切換為：${String(acc.name || '')}`;
-    fillAccountSelect();
-  });
-  const renameBtn = document.createElement('button');
-  renameBtn.className = 'button';
-  renameBtn.type = 'button';
-  renameBtn.textContent = '修改暱稱';
-  renameBtn.addEventListener('click', async () => {
-    const acc = getStoredAccount();
-    if (!acc || !acc.salt || !acc.hash) { status.textContent = '請先登入綁定帳號'; return; }
-    const nm = String(prompt('輸入新的暱稱（2–16 個字）', acc.name) || '').trim();
-    if (nm.length < 2 || nm.length > 16) { status.textContent = '暱稱需介於 2–16 字'; return; }
-    const next = { ...acc, name: nm, ts: Date.now() };
-    setStoredAccount(next);
-    try { await syncAccountToCloud(next); } catch {}
-    try { updateStoredScoresNameForAccount(next.id, nm); } catch {}
-    applyPlayerNameInputState();
-    status.textContent = '暱稱已更新';
     fillAccountSelect();
   });
   registerBtn.addEventListener('click', async () => {
@@ -4851,7 +4870,6 @@ function openAccountDialog() {
   content.appendChild(passLabel);
   content.appendChild(passInput);
   actions.appendChild(switchBtn);
-  actions.appendChild(renameBtn);
   actions.appendChild(registerBtn);
   actions.appendChild(loginBtn);
   actions.appendChild(deleteBtn);
