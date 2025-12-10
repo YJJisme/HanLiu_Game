@@ -4488,7 +4488,7 @@ function dismissAuthGateToHome() {
   const gateActions = document.getElementById('authGateActions');
   if (gateActions && main) { try { main.removeChild(gateActions); } catch {} }
   if (startScreen) startScreen.style.display = '';
-  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = true;
+  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
   applyPlayerNameInputState();
   const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = true;
   const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = true;
