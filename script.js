@@ -2086,6 +2086,7 @@ function startRevivalLevel() {
   img.style.maxWidth = '280px';
   img.style.border = '1px solid #2a2a2a';
   img.style.borderRadius = '10px';
+  img.addEventListener('load', () => { try { unlockIllustration(img.src); } catch {} }, { once: true });
   const timerText = document.createElement('p');
   timerText.className = 'dialog-text';
   let remain = 30;
@@ -3488,6 +3489,7 @@ function resolveSceneImage(img, key) {
   candidates.push(`images/${key}.png`, `${key}.png`, `./${key}.png`);
   const list = candidates.filter((x) => { const y = String(x || '').trim(); if (!y || seen.has(y)) return false; seen.add(y); return true; });
   let i = 0;
+  img.addEventListener('load', () => { try { unlockIllustration(img.src); } catch {} }, { once: true });
   const tryNext = () => { if (i >= list.length) return; img.src = list[i++]; };
   img.addEventListener('error', () => { tryNext(); }, { once: true });
   tryNext();
@@ -4533,7 +4535,8 @@ function normalizeIllustrationKey(p) {
 function getIllustrationList() {
   return [
     'hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png',
-    'han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png'
+    'han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png',
+    'han_yu_immortal.png','luliang.png','mengjiao_moon.png','Mansion.png'
   ];
 }
 function loadAccountUnlocks() {
@@ -4735,6 +4738,10 @@ function openAccountDialog() {
   status.className = 'dialog-text';
   const content = document.createElement('div');
   content.className = 'actions';
+  content.style.flexDirection = 'column';
+  content.style.alignItems = 'stretch';
+  content.style.justifyContent = 'flex-start';
+  content.style.gap = '0.5rem';
   const accountSelect = document.createElement('select');
   accountSelect.className = 'input';
   const fillAccountSelect = () => {
@@ -5171,7 +5178,12 @@ function isPreLogin() {
 function openAuthGate() {
   const main = document.querySelector('main.container');
   if (!main) return;
-  try { Array.from(document.querySelectorAll('.modal-backdrop')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } }); } catch {}
+  try {
+    Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
+    Array.from(document.querySelectorAll('.flash-overlay')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
+    const baseBackdrop = document.getElementById('modalBackdrop');
+    if (baseBackdrop) baseBackdrop.hidden = true;
+  } catch {}
   const startScreen = document.getElementById('startScreen');
   if (startScreen) startScreen.style.display = 'none';
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
