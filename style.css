@@ -471,7 +471,7 @@ body {
 #levelEpitaph .ordering-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid #2a2a2a; background: linear-gradient(180deg, #1d1f21, #161719); }
 #levelEpitaph .ordering-item.drag-over { outline: 2px solid #3b82f6; background: linear-gradient(180deg, #222, #1a1a1a); }
 #levelEpitaph .order-index { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #2a2a2a; background: #2a2a2a; color: var(--fg); display: flex; align-items: center; justify-content: center; font-weight: 800; }
-#levelEpitaph .order-preview { margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid #2a2a2a; background: linear-gradient(180deg, #1d1f21, #161719); white-space: pre-wrap; }
+#levelEpitaph .order-preview { margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid #2a2a2a; background: linear-gradient(180deg, #1d1f21, #161719); white-space: pre-wrap; color: #f7fbff; font-weight: 800; line-height: 1.7; font-size: clamp(14px, 2.6vw, 18px); text-shadow: 0 1px 0 rgba(0,0,0,0.45); }
 /* 第九關題目文字提亮 */
 #levelEpitaph .ordering-item .dialog-text { color: #f8e78e; font-weight: 800; letter-spacing: 0.04em; }
 /* Level 10 核心樣式 */

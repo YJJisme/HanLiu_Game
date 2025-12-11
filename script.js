@@ -21,21 +21,15 @@ const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
 let appVersion = '1.22';
 let releaseNotes = [
-  '做夢關事件判定順序改為「低機率→高機率」以保護稀有事件機率',
-  '新增老年稀有事件「夢回黑暗料理」（0.05%）：顯示插圖並扣 10 分',
-  '新增「失眠」（5%）：三階段插圖＋詩句說明，無加扣分',
-  '「一覺好眠」（0.1%）依階段顯示插圖並加 10 分',
-  '所有夢境事件採單一觸發，絕對不會同時發生兩個事件',
-  '圖鑑事件分區新增：睡眠／失眠／黑暗料理插圖自動解鎖'
+  '體驗優化與細節改進',
+  '修正多項介面與邏輯一致性',
+  '文字與可讀性微調'
 ];
 let releaseHistory = {
   '1.22': [
-    '做夢關事件判定順序改為「低機率→高機率」以保護稀有事件機率',
-    '新增老年稀有事件「夢回黑暗料理」（0.05%）：顯示插圖並扣 10 分',
-    '新增「失眠」（5%）：三階段插圖＋詩句說明，無加扣分',
-    '「一覺好眠」（0.1%）依階段顯示插圖並加 10 分',
-    '所有夢境事件採單一觸發，絕對不會同時發生兩個事件',
-    '圖鑑事件分區新增：睡眠／失眠／黑暗料理插圖自動解鎖'
+    '介面體驗優化與穩定性改善',
+    '排行榜與設定流程調整',
+    '文字內容與可讀性提升'
   ],
   '1.21': ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'],
   '1.2.0': [
@@ -1884,7 +1878,12 @@ const dreamQuestionBank = [
   { q: '根據〈釋言〉，韓愈認為自己「不可能傲慢放言」的主要理由是什麼？', options: ['自己年紀太輕，尚不足以在朝堂上發言', '自知才能有限，沒有任何可倚仗的背景力量', '他覺得讒言終會自然消失，不須理會', '宰相與翰林學士皆十分偏袒他，因此不會相信讒言'], correct: 1, explain: '自述「無所恃」：族親鮮少、不善交人、無宿資、弱於才而腐於力，故不可能有恃無恐、傲慢敖言。' },
   { q: '根據〈愛直贈李君房別〉，韓愈之所以特意「為天下道其為人」的最主要原因是什麼？', options: ['他擔心世人誤以為李生仗勢倚靠貴戚', '他認為李生文采絕倫，值得廣為宣傳', '他希望南陽公能以更高官職任用李生', '他想替南陽公澄清政績，避免被誤解'], correct: 0, explain: '外人或誤以為李生托婚貴富以求利，故特為其人品（正直、敢言、審思）作證明。' },
   { q: '韓愈在〈張中聽傳後敘〉中特別強調許遠的最大功績是什麼？', options: ['能統禦軍隊、善於作戰，屢破叛軍', '能以寬厚待人，使部將人人願意死守', '與張巡同心協力，守一城以捍全天下', '斷指明志，向賀蘭請求出兵援助'], correct: 2, explain: '「守一城，捍天下」為論旨重心，睢陽一城之守，關乎江淮與天下局勢。' },
-  { q: '文中「連理木」的出現最主要象徵什麼？', options: ['王尹治理河中府時，上天以祥瑞示其德政', '戰禍將至，天地示警', '城中將發生水患，需及早修治河道', '民間妖異之氣交結，預示災異'], correct: 0, explain: '以王尹之德「交暢」感天降祥，全文為德政頌，連理木象徵德政感天、祥瑞示現。' },
+  { q: '〈河中府連理木頌〉中「連理木」的出現最主要象徵什麼？', options: ['王尹治理河中府時，上天以祥瑞示其德政', '戰禍將至，天地示警', '城中將發生水患，需及早修治河道', '民間妖異之氣交結，預示災異'], correct: 0, explain: '以王尹之德「交暢」感天降祥，全文為德政頌，連理木象徵德政感天、祥瑞示現。' },
+  { q: '〈汴州東西水門記〉最主要的論述重心是？', options: ['描寫水門建築的技術與壯麗', '記錄汴州河水地勢變化的原因', '讚揚隴西公施政得當、德政顯著', '述說人民樂於參與慶典的盛況'], correct: 2, explain: '全文表面在記水門落成，實質以工程為引，集中歌頌隴西公「拯危去疵」「布武宣文」「神應祥福」等德政，是典型的政績碑銘文體。' },
+  { q: '〈燕喜亭記〉最主要的論述核心是？', options: ['展示連州自然景觀的奇特壯麗', '記錄燕喜亭建造過程的細節', '借燕喜亭與諸景之名，肯定王宏中的德行與前途', '描述地方百姓對此亭的讚嘆與向往'], correct: 2, explain: '文章表面寫亭景之勝、命名之義，本質在於以山水寓德，讚美王宏中「智以謀之，仁以居之」，點出其德性與仕途可望再振，是典型以事寓德的敘事碑記。' },
+  { q: '〈徐、泗、豪三州節度掌書記廳石記〉的主旨是？', options: ['說明節度使所轄三州的軍政情況', '強調書記一職的艱難與瑣碎', '讚揚南陽公與其三位掌書記文才相得、賓主和合', '記錄書記廳建成與刻石的過程'], correct: 2, explain: '文章以書記職任為引，實旨在稱頌南陽公文名冠世，且所辟三位書記皆「閎辨通敏」之才；又以賓主文章互為映照，氣合志同為文壇佳事，因此刻石以誌。' },
+  { q: '下列何者最能概括〈畫記〉本文所強調的核心意義？', options: ['古代軍旅生活的艱困與戰爭場面的真實再現', '此畫以眾多人物與動物姿態展現工筆細緻、匠意群集的藝術價值', '作者在旅途中偶然獲得珍物，象徵命運的無常', '趙侍御憶起少年志業，反映仕途與抱負的落差'], correct: 1, explain: '全文詳記此畫所描繪人物、馬匹、器物之繁多與各異姿態，並強調其「非一工人所能運思」而是「藂集眾工之所長」，核心在凸顯作品的藝術高度與技藝之精妙。' },
+  { q: '下列何者最能概括〈藍田縣丞廳壁記〉主旨？', options: ['讚揚藍田縣丞職位的重要性與權力之大', '揭示地方官署制度中「丞」名位不符、職權受限的困境', '記述崔斯立如何以文章與學識在京師顯名', '描述丞廳環境之優美與修繕後的煥然一新'], correct: 1, explain: '全文以「丞」職為核心，先寫其職責應廣，而實際權勢反被主簿、尉所制，名位不符；再敘崔斯立才學優異卻因制度安排而抱負難展，皆指向制度造成的職位困境，是全文的主旨所在。' },
 ];
 
 function startDreamLevel() {
@@ -1902,7 +1901,7 @@ function startDreamLevel() {
   if (verAll === 'aged' && Math.random() < 0.0005) {
     bumpScore(-10);
     const imgDark = 'han_yu_aged_dark_cuisine.png';
-    showBlockModal('夢回黑暗料理', [{ image: imgDark, text: '腥臊始發越，咀吞面汗騂｜受到驚嚇：-10 分' }], () => { sec.remove(); goToNextLevel(); });
+    showBlockModal('夢境', [{ image: imgDark, text: '腥臊始發越，咀吞面汗騂｜受到驚嚇：-10 分' }], () => { sec.remove(); goToNextLevel(); });
     return;
   }
   const rare = Math.floor(Math.random() * 1000) + 1;
@@ -1911,12 +1910,12 @@ function startDreamLevel() {
     const ver = verAll;
     const imgKey = ver === 'youth' ? 'han_yu_youth_sleep.png' : ver === 'middle' ? 'han_yu_middle_sleep.png' : 'han_yu_aged_sleep.png';
     const items = imgKey ? [{ image: imgKey, text: '你做了一場好夢，精神飽滿：+10 分' }] : [{ text: '你做了一場好夢，精神飽滿：+10 分' }];
-    showBlockModal('一覺好眠', items, () => { sec.remove(); goToNextLevel(); });
+    showBlockModal('夢境', items, () => { sec.remove(); goToNextLevel(); });
     return;
   }
   if (Math.random() < 0.05) {
     const imgIns = verAll === 'youth' ? 'han_yu_youth_insomnia.png' : verAll === 'middle' ? 'han_yu_middle_insomnia.png' : 'han_yu_aged_insomnia.png';
-    showBlockModal('失眠', [{ image: imgIns, text: '夜歸孤舟卧，展轉空及晨。謀計竟何就，嗟嗟世與身。' }], () => { sec.remove(); goToNextLevel(); });
+    showBlockModal('夢境', [{ image: imgIns, text: '夜歸孤舟卧，展轉空及晨。謀計竟何就，嗟嗟世與身。' }], () => { sec.remove(); goToNextLevel(); });
     return;
   }
   const qs = sampleQuestions(dreamQuestionBank, 1)[0];
@@ -2613,6 +2612,12 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     shareBtn.textContent = '分享結果';
     shareBtn.addEventListener('click', shareGameResult);
     actions.appendChild(shareBtn);
+    const galleryRankBtn = document.createElement('button');
+    galleryRankBtn.className = 'button';
+    galleryRankBtn.type = 'button';
+    galleryRankBtn.textContent = '圖鑑收集排行';
+    galleryRankBtn.addEventListener('click', renderUnlocksLeaderboardPage);
+    actions.appendChild(galleryRankBtn);
     if (headingText) page.appendChild(info);
     if (rankInfo.textContent) page.appendChild(rankInfo);
     page.appendChild(content);
@@ -2640,6 +2645,94 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     return;
   }
   renderLocal();
+}
+
+async function fetchUnlocksForAccountId(id) {
+  try {
+    const ep = getUnlockEndpoint();
+    const au = getUnlockAuth();
+    if (!ep || !id) return [];
+    const url = ep + (ep.includes('?') ? '&' : '?') + 'id=' + encodeURIComponent(id);
+    const r = await fetch(url, { headers: { ...(au ? { authorization: au } : {}) } });
+    if (!r.ok) return [];
+    const data = await r.json().catch(() => []);
+    return Array.isArray(data) ? data.map(normalizeIllustrationKey).filter(Boolean) : [];
+  } catch { return []; }
+}
+function getLocalUnlocksForAccountId(id) {
+  try {
+    const map = loadAccountUnlocks();
+    const list = Array.isArray(map && map[id]) ? map[id] : [];
+    return list.map(normalizeIllustrationKey).filter(Boolean);
+  } catch { return []; }
+}
+async function renderUnlocksLeaderboardPage() {
+  clearMainContent(true);
+  hideCharacterDisplay();
+  hideHpBar();
+  const main = document.querySelector('main.container');
+  const page = document.createElement('section');
+  page.className = 'dialog-container';
+  page.id = 'galleryLeaderboardPage';
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '圖鑑收集排行';
+  const info = document.createElement('p');
+  info.className = 'dialog-text';
+  const accounts = loadAccountsList();
+  const allKeys = getIllustrationList();
+  const stats = [];
+  const pushStat = (acc, items) => {
+    const set = new Set(items);
+    const count = allKeys.reduce((n, k) => n + (set.has(k) ? 1 : 0), 0);
+    const pct = allKeys.length ? Math.round((count / allKeys.length) * 100) : 0;
+    stats.push({ id: acc.id, name: acc.name || acc.id, count, pct });
+  };
+  for (const acc of accounts) {
+    let items = await fetchUnlocksForAccountId(acc.id);
+    if (!items.length) items = getLocalUnlocksForAccountId(acc.id);
+    pushStat(acc, items);
+  }
+  if (!accounts.length) {
+    const guestSet = getCurrentUnlocksSet();
+    const count = Array.from(guestSet).length;
+    const pct = allKeys.length ? Math.round((count / allKeys.length) * 100) : 0;
+    stats.push({ id: 'guest', name: localStorage.getItem('hanliu_player_name') || '無名', count, pct });
+  }
+  stats.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  info.textContent = `總圖鑑項目：${allKeys.length}｜帳號數：${accounts.length || 1}`;
+  const list = document.createElement('div');
+  list.className = 'leaderboard-content';
+  stats.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = `${i + 1}. ${s.name}`;
+    const score = document.createElement('span');
+    score.className = 'score';
+    score.textContent = `${s.count}`;
+    const route = document.createElement('span');
+    route.className = 'route';
+    route.textContent = `${s.pct}%`;
+    row.appendChild(name);
+    row.appendChild(score);
+    row.appendChild(route);
+    list.appendChild(row);
+  });
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const backBtn = document.createElement('button');
+  backBtn.className = 'button';
+  backBtn.type = 'button';
+  backBtn.textContent = '返回主頁';
+  backBtn.addEventListener('click', navigateHome);
+  actions.appendChild(backBtn);
+  page.appendChild(title);
+  page.appendChild(info);
+  page.appendChild(list);
+  page.appendChild(actions);
+  main.appendChild(page);
 }
 
 function clearMainContent(preserveStartScreen) {
@@ -4034,8 +4127,7 @@ function startLetterMazeLevel() {
           return;
         }
         if (type === 'wall') {
-          handleError('Number');
-          showBlockModal('提示', [{ text: '道路阻滯，你再次感到心神受創。' }]);
+          showBlockModal('提示', [{ text: '道路阻滯，牆不可通行。' }]);
           return;
         }
         const prev = grid.querySelector(`[data-index="${playerPos}"]`);
@@ -4094,7 +4186,7 @@ function startLetterMazeLevel() {
 
   const help = document.createElement('p');
   help.className = 'dialog-text';
-  help.textContent = '遊戲說明：點擊相鄰白色路徑移動；依序完成三封「函」，再前往「公府」。點擊牆或非相鄰格會受傷。移到「函」上會顯示全稱。';
+  help.textContent = '遊戲說明：點擊相鄰白色路徑移動；依序完成三封「函」，再前往「公府」。點擊非相鄰格會受傷；點擊牆僅無效。移到「函」上會顯示全稱。';
   level.appendChild(title);
   level.appendChild(help);
   level.appendChild(grid);
@@ -4615,6 +4707,11 @@ function unlockIllustration(p) {
   cur.add(k);
   persistCurrentUnlocks(cur);
 }
+function setIllustrationUnlocked(key, on) {
+  const cur = getCurrentUnlocksSet();
+  if (on) cur.add(key); else cur.delete(key);
+  persistCurrentUnlocks(cur);
+}
 async function openGallery() {
   if (document.querySelector('.modal-backdrop.active-block')) return;
   try { await syncUnlocksFromCloud(); } catch {}
@@ -4668,6 +4765,19 @@ async function openGallery() {
         img.style.objectFit = 'contain';
         cell.appendChild(img);
         cell.appendChild(label);
+        img.style.cursor = 'pointer';
+        label.style.cursor = 'pointer';
+        img.addEventListener('click', () => { try { openIllustrationDetail(key); } catch {} });
+        label.addEventListener('click', () => { try { openIllustrationDetail(key); } catch {} });
+        if (devModeEnabled) {
+          const toggleBtn = document.createElement('button');
+          toggleBtn.className = 'button';
+          toggleBtn.type = 'button';
+          toggleBtn.textContent = '鎖定';
+          toggleBtn.style.marginTop = '0.4rem';
+          toggleBtn.addEventListener('click', () => { try { setIllustrationUnlocked(key, false); document.body.removeChild(overlay); } catch {} try { openGallery(); } catch {} });
+          cell.appendChild(toggleBtn);
+        }
       } else {
         const lock = document.createElement('div');
         lock.textContent = '已鎖定';
@@ -4681,12 +4791,151 @@ async function openGallery() {
         lock.style.borderRadius = '10px';
         lock.style.color = '#9aa0a6';
         cell.appendChild(lock);
-        cell.appendChild(label);
+        if (devModeEnabled) {
+          cell.appendChild(label);
+          const toggleBtn = document.createElement('button');
+          toggleBtn.className = 'button';
+          toggleBtn.type = 'button';
+          toggleBtn.textContent = '解鎖';
+          toggleBtn.style.marginTop = '0.4rem';
+          toggleBtn.addEventListener('click', () => { try { setIllustrationUnlocked(key, true); document.body.removeChild(overlay); } catch {} try { openGallery(); } catch {} });
+          cell.appendChild(toggleBtn);
+        }
       }
       grid.appendChild(cell);
     });
     modal.appendChild(grid);
   });
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+function getIllustrationDescription(key) {
+  const map = {
+    'hanyu_ss.png': '泰山北斗，文道同山河偉力。',
+    'hanyu_s.png': '百代文宗，古文運動引領復興。',
+    'hanyu_a.png': '唐宋八大家之首，文筆雄健。',
+    'hanyu_b.png': '剛直名臣，力抗流俗。',
+    'hanyu_c.png': '國子先生，尚需融會貫通。',
+    'hanyu_d.png': '時運不濟，才華待磨。',
+    'han_yu_youth_dead.png': '少壯未遇，行路艱難。',
+    'han_yu_middle_dead.png': '中歲失意，志不改。',
+    'han_yu_aged_dead.png': '暮年殞志，然道不泯。',
+    'han_yu_youth_sleep.png': '少歲好眠，精神飽滿。',
+    'han_yu_middle_sleep.png': '中歲好眠，心志復甦。',
+    'han_yu_aged_sleep.png': '老年好眠，神清氣朗。',
+    'han_yu_youth_insomnia.png': '少歲失眠，愁思難寐。',
+    'han_yu_middle_insomnia.png': '中歲失眠，政事牽心。',
+    'han_yu_aged_insomnia.png': '老年失眠，世事無奈。',
+    'han_yu_aged_dark_cuisine.png': '黑暗料理驚魂，失分之夢。',
+    'han_yu_immortal.png': '迴光返照，三十秒問答。',
+    'luliang.png': '陸贄、梁肅出現，文名遠播，轉機已現',
+    'mengjiao_moon.png': '孟郊月下，詩友同心。',
+    'Mansion.png': '宰相公府，門緊閉而志不屈。'
+  };
+  return map[key] || '';
+}
+function buildIllustrationShareText(key, desc) {
+  const lines = [];
+  lines.push(`圖鑑：${key}`);
+  if (desc) lines.push(`說明：${desc}`);
+  return lines.join('\n');
+}
+async function shareIllustration(key) {
+  const desc = getIllustrationDescription(key);
+  const img = new Image();
+  const pad = 20;
+  const w = 600; const h = 740;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0,0,w,h);
+  const y = pad;
+  const draw = () => {
+    const iw = w - pad * 2; const ih = 360;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(pad, y, iw, ih);
+    try { ctx.drawImage(img, pad, y, iw, ih); } catch {}
+    ctx.fillStyle = '#f7fbff';
+    ctx.font = 'bold 26px system-ui, Arial';
+    ctx.fillText('寒流｜圖鑑', pad, ih + y + 40);
+    ctx.font = 'bold 22px system-ui, Arial';
+    ctx.fillText(String(key), pad, ih + y + 80);
+    ctx.font = '20px system-ui, Arial';
+    const text = buildIllustrationShareText(key, desc);
+    const maxWidth = w - pad * 2;
+    const words = text.split(/\n+/);
+    let ty = ih + y + 120;
+    words.forEach((ln) => {
+      let rest = ln;
+      while (rest.length) {
+        let len = rest.length; let seg = rest.slice(0, len);
+        while (ctx.measureText(seg).width > maxWidth && len > 8) { len -= 1; seg = rest.slice(0, len); }
+        ctx.fillText(seg, pad, ty);
+        ty += 30; rest = rest.slice(seg.length);
+      }
+    });
+    ctx.fillStyle = '#9aa0a6';
+    ctx.font = '18px system-ui, Arial';
+    const dt = new Date();
+    const footer = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    ctx.fillText(footer, pad, h - pad - 20);
+  };
+  const asBlob = () => new Promise((resolve) => { canvas.toBlob((b) => resolve(b), 'image/png'); });
+  await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; img.src = key; });
+  draw();
+  const blob = await asBlob();
+  const text = buildIllustrationShareText(key, desc);
+  if (navigator.share && blob) {
+    try {
+      const file = new File([blob], `hanliu_gallery_${key}.png`, { type: 'image/png' });
+      const canFiles = typeof navigator.canShare === 'function' ? navigator.canShare({ files: [file] }) : true;
+      if (canFiles) { await navigator.share({ title: '寒流｜圖鑑', text, files: [file] }); return; }
+    } catch {}
+  }
+  const url = URL.createObjectURL(blob);
+  const doDownload = () => {
+    try { const a = document.createElement('a'); a.href = url; a.download = `hanliu_gallery_${key}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); } catch {}
+  };
+  const doCopy = () => { try { navigator.clipboard.writeText(text); } catch {} };
+  showShareModal(url, text, doDownload, doCopy);
+}
+function openIllustrationDetail(key) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '圖鑑詳情';
+  const img = document.createElement('img');
+  img.className = 'illustration';
+  img.src = key;
+  img.alt = key;
+  img.style.maxWidth = '320px';
+  img.style.border = '1px solid #2a2a2a';
+  img.style.borderRadius = '10px';
+  const p = document.createElement('p');
+  p.className = 'dialog-text';
+  p.textContent = getIllustrationDescription(key) || '';
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'button';
+  shareBtn.type = 'button';
+  shareBtn.textContent = '分享';
+  shareBtn.addEventListener('click', () => { try { shareIllustration(key); } catch {} });
+  actions.appendChild(shareBtn);
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(img);
+  modal.appendChild(p);
+  modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 }
