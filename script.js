@@ -1883,10 +1883,17 @@ function startDreamLevel() {
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '做夢關：夢境試題';
+  const verAll = getCharacterVersion();
+  if (verAll === 'aged' && Math.random() < 0.0005) {
+    bumpScore(-10);
+    const imgDark = 'han_yu_aged_dark_cuisine.png';
+    showBlockModal('夢回黑暗料理', [{ image: imgDark, text: '受到驚嚇：-10 分' }], () => { sec.remove(); goToNextLevel(); });
+    return;
+  }
   const rare = Math.floor(Math.random() * 1000) + 1;
   if (rare === 1) {
     bumpScore(10);
-    const ver = getCharacterVersion();
+    const ver = verAll;
     const imgKey = ver === 'youth' ? 'han_yu_youth_sleep.png' : ver === 'middle' ? 'han_yu_middle_sleep.png' : 'han_yu_aged_sleep.png';
     const items = imgKey ? [{ image: imgKey, text: '你做了一場好夢，精神飽滿：+10 分' }] : [{ text: '你做了一場好夢，精神飽滿：+10 分' }];
     showBlockModal('一覺好眠', items, () => { sec.remove(); goToNextLevel(); });
@@ -4541,14 +4548,14 @@ function getIllustrationList() {
     'hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png',
     'han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png',
     'han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png',
-    'han_yu_immortal.png','luliang.png','mengjiao_moon.png','Mansion.png'
+    'han_yu_aged_dark_cuisine.png','han_yu_immortal.png','luliang.png','mengjiao_moon.png','Mansion.png'
   ];
 }
 function getIllustrationGroups() {
   return [
     { title: '結算', items: ['hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png'] },
     { title: '場景', items: ['luliang.png','Mansion.png'] },
-    { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_immortal.png','mengjiao_moon.png'] },
+    { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_aged_dark_cuisine.png','han_yu_immortal.png','mengjiao_moon.png'] },
   ];
 }
 function loadAccountUnlocks() {
