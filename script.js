@@ -19,9 +19,24 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.21';
-let releaseNotes = ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'];
+let appVersion = '1.22';
+let releaseNotes = [
+  '做夢關事件判定順序改為「低機率→高機率」以保護稀有事件機率',
+  '新增老年稀有事件「夢回黑暗料理」（0.05%）：顯示插圖並扣 10 分',
+  '新增「失眠」（5%）：三階段插圖＋詩句說明，無加扣分',
+  '「一覺好眠」（0.1%）依階段顯示插圖並加 10 分',
+  '所有夢境事件採單一觸發，絕對不會同時發生兩個事件',
+  '圖鑑事件分區新增：睡眠／失眠／黑暗料理插圖自動解鎖'
+];
 let releaseHistory = {
+  '1.22': [
+    '做夢關事件判定順序改為「低機率→高機率」以保護稀有事件機率',
+    '新增老年稀有事件「夢回黑暗料理」（0.05%）：顯示插圖並扣 10 分',
+    '新增「失眠」（5%）：三階段插圖＋詩句說明，無加扣分',
+    '「一覺好眠」（0.1%）依階段顯示插圖並加 10 分',
+    '所有夢境事件採單一觸發，絕對不會同時發生兩個事件',
+    '圖鑑事件分區新增：睡眠／失眠／黑暗料理插圖自動解鎖'
+  ],
   '1.21': ['修正排行榜進度顯示僅通關為 Completed','移除首頁音量控制，統一使用設定視窗','設定加入登出按鈕','支援同裝置多帳號與暱稱修改，排行榜跨裝置顯示同步'],
   '1.2.0': [
     '新增登入選擇入口與隱私導向本機帳號',
@@ -1887,7 +1902,7 @@ function startDreamLevel() {
   if (verAll === 'aged' && Math.random() < 0.0005) {
     bumpScore(-10);
     const imgDark = 'han_yu_aged_dark_cuisine.png';
-    showBlockModal('夢回黑暗料理', [{ image: imgDark, text: '受到驚嚇：-10 分' }], () => { sec.remove(); goToNextLevel(); });
+    showBlockModal('夢回黑暗料理', [{ image: imgDark, text: '腥臊始發越，咀吞面汗騂｜受到驚嚇：-10 分' }], () => { sec.remove(); goToNextLevel(); });
     return;
   }
   const rare = Math.floor(Math.random() * 1000) + 1;
@@ -1897,6 +1912,11 @@ function startDreamLevel() {
     const imgKey = ver === 'youth' ? 'han_yu_youth_sleep.png' : ver === 'middle' ? 'han_yu_middle_sleep.png' : 'han_yu_aged_sleep.png';
     const items = imgKey ? [{ image: imgKey, text: '你做了一場好夢，精神飽滿：+10 分' }] : [{ text: '你做了一場好夢，精神飽滿：+10 分' }];
     showBlockModal('一覺好眠', items, () => { sec.remove(); goToNextLevel(); });
+    return;
+  }
+  if (Math.random() < 0.05) {
+    const imgIns = verAll === 'youth' ? 'han_yu_youth_insomnia.png' : verAll === 'middle' ? 'han_yu_middle_insomnia.png' : 'han_yu_aged_insomnia.png';
+    showBlockModal('失眠', [{ image: imgIns, text: '夜歸孤舟卧，展轉空及晨。謀計竟何就，嗟嗟世與身。' }], () => { sec.remove(); goToNextLevel(); });
     return;
   }
   const qs = sampleQuestions(dreamQuestionBank, 1)[0];
@@ -4548,6 +4568,7 @@ function getIllustrationList() {
     'hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png',
     'han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png',
     'han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png',
+    'han_yu_youth_insomnia.png','han_yu_middle_insomnia.png','han_yu_aged_insomnia.png',
     'han_yu_aged_dark_cuisine.png','han_yu_immortal.png','luliang.png','mengjiao_moon.png','Mansion.png'
   ];
 }
@@ -4555,7 +4576,7 @@ function getIllustrationGroups() {
   return [
     { title: '結算', items: ['hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png'] },
     { title: '場景', items: ['luliang.png','Mansion.png'] },
-    { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_aged_dark_cuisine.png','han_yu_immortal.png','mengjiao_moon.png'] },
+    { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_youth_insomnia.png','han_yu_middle_insomnia.png','han_yu_aged_insomnia.png','han_yu_aged_dark_cuisine.png','han_yu_immortal.png','mengjiao_moon.png'] },
   ];
 }
 function loadAccountUnlocks() {
