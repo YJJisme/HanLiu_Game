@@ -4769,6 +4769,8 @@ async function openGallery() {
         label.style.cursor = 'pointer';
         img.addEventListener('click', () => { try { openIllustrationDetail(key); } catch {} });
         label.addEventListener('click', () => { try { openIllustrationDetail(key); } catch {} });
+        const r = getIllustrationRarity(key);
+        if (r) { const rb = document.createElement('span'); rb.className = 'badge sm'; const variant = getIllustrationRarityClass(key); if (variant) rb.classList.add(variant); rb.textContent = r; rb.style.marginTop = '0.4rem'; cell.appendChild(rb); }
         if (devModeEnabled) {
           const toggleBtn = document.createElement('button');
           toggleBtn.className = 'button';
@@ -4834,10 +4836,32 @@ function getIllustrationDescription(key) {
   };
   return map[key] || '';
 }
+function getIllustrationRarity(key) {
+  const map = {
+    'han_yu_aged_dark_cuisine.png': '0.05%',
+    'han_yu_youth_sleep.png': '0.1%',
+    'han_yu_middle_sleep.png': '0.1%',
+    'han_yu_aged_sleep.png': '0.1%',
+    'han_yu_youth_insomnia.png': '5%',
+    'han_yu_middle_insomnia.png': '5%',
+    'han_yu_aged_insomnia.png': '5%'
+  };
+  return map[key] || '';
+}
+function getIllustrationRarityClass(key) {
+  const r = getIllustrationRarity(key);
+  if (!r) return '';
+  if (r === '0.05%') return 'legendary';
+  if (r === '0.1%') return 'rare';
+  if (r === '5%') return 'uncommon';
+  return '';
+}
 function buildIllustrationShareText(key, desc) {
   const lines = [];
   lines.push(`圖鑑：${key}`);
   if (desc) lines.push(`說明：${desc}`);
+  const rare = getIllustrationRarity(key);
+  if (rare) lines.push(`稀有度：${rare}`);
   return lines.join('\n');
 }
 async function shareIllustration(key) {
@@ -4923,6 +4947,9 @@ function openIllustrationDetail(key) {
   const p = document.createElement('p');
   p.className = 'dialog-text';
   p.textContent = getIllustrationDescription(key) || '';
+  const r = getIllustrationRarity(key);
+  let rp = null;
+  if (r) { rp = document.createElement('span'); rp.className = `badge`; const variant = getIllustrationRarityClass(key); if (variant) rp.classList.add(variant); rp.textContent = r; }
   const actions = document.createElement('div');
   actions.className = 'actions';
   const shareBtn = document.createElement('button');
@@ -4935,6 +4962,7 @@ function openIllustrationDetail(key) {
   modal.appendChild(title);
   modal.appendChild(img);
   modal.appendChild(p);
+  if (rp) { const row = document.createElement('div'); row.className = 'actions'; row.appendChild(rp); modal.appendChild(row); }
   modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
