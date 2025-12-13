@@ -2516,6 +2516,10 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     let list = arr;
     if (filterRoute && filterRoute !== 'All') list = arr.filter(x => x.route === filterRoute);
     list = selectBestPerName(list);
+    const currentRec = arr.find(r => String(r && r.id || '') === String(lastRunId || ''));
+    if (currentRec && !list.some(r => String(r && r.id || '') === String(currentRec.id))) {
+      list.push(currentRec);
+    }
     list.sort((a, b) => b.score - a.score);
     const main = document.querySelector('main.container');
     if (main) { main.style.alignItems = 'flex-start'; main.style.justifyItems = 'center'; main.scrollTop = 0; }

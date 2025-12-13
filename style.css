@@ -172,14 +172,18 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  border: 1px solid #2a2a2a;
-  background: linear-gradient(180deg, #1d1f21, #161719);
-  color: var(--fg);
-  font-size: 20px;
+  border: 1px solid #a80f0f;
+  background: linear-gradient(180deg, #e84e4e, #a80f0f);
+  color: #ffffff;
+  font-size: 24px;
   line-height: 1;
   cursor: pointer;
   z-index: 2;
+  box-shadow: 0 0 0 3px color-mix(in oklab, #e84e4e 22%, transparent);
 }
+.modal-close:hover { border-color: #ff6b6b; box-shadow: 0 0 0 3px color-mix(in oklab, #ff6b6b 30%, transparent); transform: translateY(-1px); }
+.modal-close:active { transform: translateY(0); opacity: 0.95; }
+.modal.hc3 .modal-close { color: #ffffff; border-color: #a80f0f; background: linear-gradient(180deg, #e84e4e, #a80f0f); }
 
 .modal.hc3 .modal-title { color: #ffffff; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 .modal.hc3 .dialog-text { color: #f1f5f9; font-weight: 900; letter-spacing: 0.04em; text-shadow: 0 1px 0 rgba(0,0,0,0.35); }
