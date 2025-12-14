@@ -19,9 +19,11 @@
       <div class="actions">
         <button id="startBtn" class="button" type="button">開始遊戲</button>
         <button id="leaderboardBtn" class="button" type="button">排行榜</button>
-        <button id="noticeBtn" class="button" type="button">公告</button>
-        <button id="aboutBtn" class="button" type="button">關於遊戲</button>
+        <button id="dailyCheckInBtn" class="button" type="button">每日領賞</button>
+        <button id="drawCardBtn" class="button" type="button">筆墨祈願</button>
+        <button id="cardManagerBtn" class="button" type="button">卡片背包</button>
       </div>
+      <div id="selectCardArea" class="card-select" hidden></div>
       <div class="controls" id="debugControls">
         <label for="debugLevelInput" class="dialog-text" style="margin-top:1rem">開發者模式：選擇起始關卡</label>
       </div>
@@ -62,5 +64,6 @@
   <input id="homeVolume" class="home-volume" type="range" min="0" max="100" value="35" aria-label="音量" hidden>
   <input id="homeSfxVolume" class="home-volume" type="range" min="0" max="100" value="60" aria-label="音效音量" hidden>
   <audio id="bgm" src="music1.mp3" autoplay loop playsinline style="display:none"></audio>
+  <div id="coinsDisplay" hidden>貨幣：0</div>
 </body>
 </html>
