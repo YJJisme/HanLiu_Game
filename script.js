@@ -95,10 +95,11 @@ function showCoinsOnHome() { try { if (coinsDisplay) { coinsDisplay.hidden = fal
 function hideCoins() { try { if (coinsDisplay) coinsDisplay.hidden = true; } catch {} }
 
 let currentLevelMistakes = 0;
+let dreamGambleActive = false;
 function storageKey(base) { return `hanliu_${devModeEnabled ? 'dev' : 'user'}_${base}`; }
 const CARD_DATA = [
   { id: 'card_exile', name: '夕貶潮州', rarity: 'SR', desc: '一封朝奏九重天，夕貶潮州路八千。被貶潮州前不會死亡；但每關依錯誤次數扣分。' },
-  { id: 'card_score_plus', name: '筆力精進', rarity: 'N', desc: '加分效果在通關後結算' },
+  { id: 'card_dream', name: '莊周夢蝶', rarity: 'N', desc: '莫憂世事兼身事，須著人間比夢間。作夢關卡可選擇觸發，使稀有事件發生機率提高 10%；攜帶出征即視同使用，該局結算扣除。' },
   { id: 'card_spring', name: '早春小雨', rarity: 'R', desc: '天街小雨潤如酥，草色遙看近卻無。適用關卡顯示「小雨提示」高亮正解；通關後依失誤：完美 +5，失誤 -5。' },
   { id: 'card_memorial', name: '諫迎佛骨', rarity: 'SSR', desc: '欲為聖明除弊事，肯將衰朽惜殘年！一血挑戰：生命上限 1；每關通關後額外 +10 分。', effectType: 'HARDCORE_SCORE', hpLimit: 1, bonusPerLevel: 10 },
 ];
@@ -107,6 +108,7 @@ function getCardRarity(id) { const f = CARD_DATA.find(x => x.id === id); return 
 function getCardImage(id) {
   const map = {
     card_exile: 'card_exile.png',
+    card_dream: 'card_dream.png',
     card_spring: 'card_spring.png',
     card_memorial: 'card_memorial.png',
   };
@@ -217,7 +219,11 @@ function openCardManager() {
         ov.appendChild(md); document.body.appendChild(ov);
       };
       del.addEventListener('click', (e) => { e.stopPropagation(); confirmDelete(); });
-      row.addEventListener('click', (e) => { const btn = (e.target && e.target.closest) ? e.target.closest('button') : null; if (btn) return; confirmDelete(); });
+      row.addEventListener('click', (e) => {
+        const btn = (e.target && e.target.closest) ? e.target.closest('button') : null;
+        if (btn) return;
+        openInventoryCardDetail(id);
+      });
       row.appendChild(name);
       row.appendChild(equip);
       row.appendChild(del);
@@ -2110,6 +2116,7 @@ const dreamQuestionBank = [
 ];
 
 function startDreamLevel() {
+  dreamGambleActive = false;
   applyLevelStyle('Dream');
   updateCharacterDisplay();
   showHpBar();
@@ -2120,25 +2127,39 @@ function startDreamLevel() {
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '做夢關：夢境試題';
+  const dreamActions = document.createElement('div');
+  dreamActions.className = 'actions';
+  if (selectedCardId === 'card_dream') {
+    const triggerBtn = document.createElement('button');
+    triggerBtn.className = 'button';
+    triggerBtn.type = 'button';
+    triggerBtn.textContent = '觸發：莊周夢蝶（+10% 稀有事件）';
+    triggerBtn.addEventListener('click', () => {
+      dreamGambleActive = true;
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = '已觸發：莊周夢蝶';
+    });
+    dreamActions.appendChild(triggerBtn);
+  }
   const verAll = getCharacterVersion();
-  if (verAll === 'aged' && Math.random() < 0.0005) {
+  const boost = dreamGambleActive ? 1.10 : 1.00;
+  if (verAll === 'aged' && Math.random() < 0.0005 * boost) {
     bumpScore(-10);
     const imgDark = 'han_yu_aged_dark_cuisine.png';
-    showBlockModal('夢境', [{ image: imgDark, text: '腥臊始發越，咀吞面汗騂｜受到驚嚇：-10 分' }], () => { sec.remove(); goToNextLevel(); });
+    showBlockModal('夢境', [{ image: imgDark, text: '腥臊始發越，咀吞面汗騂｜受到驚嚇：-10 分' }], () => { sec.remove(); if (selectedCardId === 'card_dream') consumeCard(); goToNextLevel(); });
     return;
   }
-  const rare = Math.floor(Math.random() * 1000) + 1;
-  if (rare === 1) {
+  if (Math.random() < 0.001 * boost) {
     bumpScore(10);
     const ver = verAll;
     const imgKey = ver === 'youth' ? 'han_yu_youth_sleep.png' : ver === 'middle' ? 'han_yu_middle_sleep.png' : 'han_yu_aged_sleep.png';
     const items = imgKey ? [{ image: imgKey, text: '你做了一場好夢，精神飽滿：+10 分' }] : [{ text: '你做了一場好夢，精神飽滿：+10 分' }];
-    showBlockModal('夢境', items, () => { sec.remove(); goToNextLevel(); });
+    showBlockModal('夢境', items, () => { sec.remove(); if (selectedCardId === 'card_dream') consumeCard(); goToNextLevel(); });
     return;
   }
-  if (Math.random() < 0.05) {
+  if (Math.random() < 0.05 * boost) {
     const imgIns = verAll === 'youth' ? 'han_yu_youth_insomnia.png' : verAll === 'middle' ? 'han_yu_middle_insomnia.png' : 'han_yu_aged_insomnia.png';
-    showBlockModal('夢境', [{ image: imgIns, text: '夜歸孤舟卧，展轉空及晨。謀計竟何就，嗟嗟世與身。' }], () => { sec.remove(); goToNextLevel(); });
+    showBlockModal('夢境', [{ image: imgIns, text: '夜歸孤舟卧，展轉空及晨。謀計竟何就，嗟嗟世與身。' }], () => { sec.remove(); if (selectedCardId === 'card_dream') consumeCard(); goToNextLevel(); });
     return;
   }
   const qs = sampleQuestions(dreamQuestionBank, 1)[0];
@@ -2173,13 +2194,13 @@ function startDreamLevel() {
           finalize(() => {
             errorCount = Math.max(0, errorCount - 1);
             updateHpBar();
-            showBlockModal('提示', [{ text: '已回血' }], () => { sec.remove(); goToNextLevel(); });
+            showBlockModal('提示', [{ text: '已回血' }], () => { sec.remove(); if (selectedCardId === 'card_dream') consumeCard(); goToNextLevel(); });
           });
         });
         scoreBtn.addEventListener('click', () => {
           finalize(() => {
             bumpScore(5);
-            showBlockModal('提示', [{ text: '獲得 +5 分' }], () => { sec.remove(); goToNextLevel(); });
+            showBlockModal('提示', [{ text: '獲得 +5 分' }], () => { sec.remove(); if (selectedCardId === 'card_dream') consumeCard(); goToNextLevel(); });
           });
         });
         actions.appendChild(healBtn);
@@ -2188,12 +2209,13 @@ function startDreamLevel() {
         sec.appendChild(actions);
       } else {
         const ex = qs.explain || '解析：請再思考本文主旨與關鍵語句。';
-        showBlockModal('解析', [{ text: ex }, { text: '單純夢醒，進入下一關。' }], () => { sec.remove(); goToNextLevel(); });
+        showBlockModal('解析', [{ text: ex }, { text: '單純夢醒，進入下一關。' }], () => { sec.remove(); if (selectedCardId === 'card_dream') consumeCard(); goToNextLevel(); });
       }
     });
     list.appendChild(btn);
   });
   sec.appendChild(title);
+  if (dreamActions.children.length) sec.appendChild(dreamActions);
   sec.appendChild(prompt);
   sec.appendChild(list);
   main.appendChild(sec);
@@ -3957,14 +3979,15 @@ function openPreEquipModal(onConfirm) {
     const head = document.createElement('h3'); head.className = 'modal-title'; head.textContent = getCardName(id);
     const badge = document.createElement('span'); badge.className = `rar-badge rar-${getCardRarity(id)}`; badge.textContent = getCardRarity(id); head.appendChild(badge);
     const imgSrc = getCardImage(id);
-    if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'card-img'; preview.appendChild(img); }
+    let imgEl = null;
+    if (imgSrc) { imgEl = document.createElement('img'); imgEl.src = imgSrc; imgEl.alt = getCardName(id); imgEl.className = 'card-img'; }
     const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === id)?.desc) || '';
     const warn = document.createElement('p'); warn.className = 'dialog-text'; warn.textContent = '提醒：使用後卡片將消失（消耗品）。';
     const actions = document.createElement('div'); actions.className = 'actions';
     const equipBtn = document.createElement('button'); equipBtn.className = 'button'; equipBtn.type = 'button'; equipBtn.textContent = '裝備'; equipBtn.addEventListener('click', () => { setSelectedCard(id); status.textContent = `目前裝備：${getCardName(selectedCardId)}（${getCardRarity(selectedCardId)}）`; });
     const unequipBtn = document.createElement('button'); unequipBtn.className = 'button'; unequipBtn.type = 'button'; unequipBtn.textContent = '不裝備'; unequipBtn.addEventListener('click', () => { setSelectedCard(''); status.textContent = '目前裝備：無'; });
     actions.appendChild(equipBtn); actions.appendChild(unequipBtn);
-    preview.appendChild(head); if (imgSrc) preview.appendChild(img); preview.appendChild(desc); preview.appendChild(warn); preview.appendChild(actions);
+    preview.appendChild(head); if (imgEl) preview.appendChild(imgEl); preview.appendChild(desc); preview.appendChild(warn); preview.appendChild(actions);
   };
   const inv = loadInventory();
   list.innerHTML = '';
