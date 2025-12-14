@@ -180,50 +180,44 @@ function openCardManager() {
   mode.textContent = `模式：${devModeEnabled ? '開發者' : '一般'}｜上限：${devModeEnabled ? '無限制' : '5 張'}`;
   const list = document.createElement('div');
   list.className = 'card-select';
-  const preview = document.createElement('div');
-  preview.className = 'dialog-container';
   const inv = loadInventory();
-  let previewId = '';
-  const renderPreview = () => {
-    preview.innerHTML = '';
-    if (!previewId) { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = '點擊左側卡片以查看詳細'; preview.appendChild(p); return; }
-    const head = document.createElement('h3'); head.className = 'modal-title'; head.textContent = getCardName(previewId);
-    const badge = document.createElement('span'); badge.className = `rar-badge rar-${getCardRarity(previewId)}`; badge.textContent = getCardRarity(previewId); head.appendChild(badge);
-    const imgSrc = getCardImage(previewId);
-    const img = document.createElement('img');
-    img.alt = getCardName(previewId);
-    img.className = 'card-img';
-    if (imgSrc) { img.src = imgSrc; }
-    const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === previewId)?.desc) || '';
-    const actions = document.createElement('div'); actions.className = 'actions';
-    const equipBtn = document.createElement('button'); equipBtn.className = 'button'; equipBtn.type = 'button'; equipBtn.textContent = '裝備'; equipBtn.addEventListener('click', () => { setSelectedCard(previewId); render(); });
-    const unequipBtn = document.createElement('button'); unequipBtn.className = 'button'; unequipBtn.type = 'button'; unequipBtn.textContent = '卸下'; unequipBtn.addEventListener('click', () => { if (selectedCardId === previewId) setSelectedCard(''); render(); });
-    actions.appendChild(equipBtn); actions.appendChild(unequipBtn);
-    preview.appendChild(head);
-    if (imgSrc) preview.appendChild(img);
-    preview.appendChild(desc);
-    preview.appendChild(actions);
-  };
   const render = () => {
     list.innerHTML = '';
     const cur = loadInventory();
     cur.forEach((id) => {
       const row = document.createElement('div');
       row.className = `card-item rar-${getCardRarity(id)}`;
-      if (id === selectedCardId) row.classList.add('selected');
-      const name = document.createElement('span'); name.textContent = `${getCardName(id)}（${getCardRarity(id)}）`;
-      const equip = document.createElement('button'); equip.className = 'button'; equip.type = 'button'; equip.textContent = '裝備'; equip.style.marginLeft = '8px';
-      const del = document.createElement('button'); del.className = 'button'; del.type = 'button'; del.textContent = '刪除'; del.style.marginLeft = '8px';
-      equip.addEventListener('click', () => { setSelectedCard(id); render(); });
-      del.addEventListener('click', () => {
-        const arr = loadInventory();
-        const ix = arr.indexOf(id);
-        if (ix >= 0) arr.splice(ix, 1);
-        saveInventory(arr);
-        if (selectedCardId === id) setSelectedCard('');
-        render();
-      });
-      row.addEventListener('click', () => { openInventoryCardDetail(id); });
+       if (id === selectedCardId) row.classList.add('selected');
+       const name = document.createElement('span'); name.textContent = `${getCardName(id)}（${getCardRarity(id)}）`;
+       const equip = document.createElement('button'); equip.className = 'button'; equip.type = 'button'; equip.textContent = '裝備'; equip.style.marginLeft = '8px';
+       const del = document.createElement('button'); del.className = 'button'; del.type = 'button'; del.textContent = '刪除'; del.style.marginLeft = '8px';
+      equip.addEventListener('click', (e) => { e.stopPropagation(); setSelectedCard(id); render(); });
+      const confirmDelete = () => {
+        const ov = document.createElement('div'); ov.className = 'modal-backdrop active-block';
+        const md = document.createElement('div'); md.className = 'modal';
+        const x = document.createElement('button'); x.className = 'modal-close'; x.type = 'button'; x.textContent = '×';
+        x.addEventListener('click', () => { try { document.body.removeChild(ov); } catch {} });
+        const t = document.createElement('h2'); t.className = 'modal-title'; t.textContent = '刪除卡片';
+        const msg = document.createElement('p'); msg.className = 'dialog-text'; msg.textContent = `是否確定刪除「${getCardName(id)}（${getCardRarity(id)}）」？`;
+        const actions = document.createElement('div'); actions.className = 'modal-actions';
+        const ok = document.createElement('button'); ok.className = 'button'; ok.type = 'button'; ok.textContent = '確定刪除';
+        ok.addEventListener('click', () => {
+          const arr = loadInventory();
+          const ix = arr.indexOf(id);
+          if (ix >= 0) arr.splice(ix, 1);
+          saveInventory(arr);
+          if (selectedCardId === id) setSelectedCard('');
+          try { document.body.removeChild(ov); } catch {}
+          render();
+        });
+        const cancel = document.createElement('button'); cancel.className = 'button'; cancel.type = 'button'; cancel.textContent = '取消';
+        cancel.addEventListener('click', () => { try { document.body.removeChild(ov); } catch {} });
+        actions.appendChild(ok); actions.appendChild(cancel);
+        md.appendChild(x); md.appendChild(t); md.appendChild(msg); md.appendChild(actions);
+        ov.appendChild(md); document.body.appendChild(ov);
+      };
+      del.addEventListener('click', (e) => { e.stopPropagation(); confirmDelete(); });
+      row.addEventListener('click', (e) => { const btn = (e.target && e.target.closest) ? e.target.closest('button') : null; if (btn) return; confirmDelete(); });
       row.appendChild(name);
       row.appendChild(equip);
       row.appendChild(del);
@@ -233,7 +227,6 @@ function openCardManager() {
       const empty = document.createElement('p'); empty.className = 'dialog-text'; empty.textContent = '目前尚無卡片';
       list.appendChild(empty);
     }
-    renderPreview();
   };
   render();
   const actions = document.createElement('div'); actions.className = 'actions';
@@ -243,7 +236,6 @@ function openCardManager() {
   modal.appendChild(title);
   modal.appendChild(mode);
   modal.appendChild(list);
-  modal.appendChild(preview);
   modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -3857,6 +3849,42 @@ function playSpringHintEffect() {
     a.play().catch(() => {});
   } catch {}
 }
+function triggerMemorialEffect() {
+  try {
+    const fx = document.createElement('div'); fx.className = 'ssr-effect-memorial';
+    for (let i = 0; i < 120; i++) {
+      const p = document.createElement('i');
+      p.className = 'ash ' + (Math.random() < 0.6 ? 'black' : 'gold');
+      p.style.left = (Math.random() * 100) + 'vw';
+      p.style.setProperty('--x', (Math.random() * 40 - 20) + 'px');
+      p.style.setProperty('--t', (2.4 + Math.random() * 1.6) + 's');
+      fx.appendChild(p);
+    }
+    document.body.appendChild(fx);
+    setTimeout(() => { try { document.body.removeChild(fx); } catch {} }, 1000);
+  } catch {}
+  try {
+    const a = new Audio('drum_boom.mp3');
+    a.volume = Math.min(1, (bgmVolume || 0.6) * 0.9);
+    a.play().catch(() => {});
+  } catch {}
+  try {
+    const main = document.querySelector('main.container') || document.body;
+    const t0 = performance.now();
+    const dur = 500;
+    const base = getComputedStyle(main).transform;
+    function shake(now) {
+      const el = main;
+      const dt = now - t0;
+      if (dt >= dur) { el.style.transform = base; return; }
+      const x = (Math.random() * 10 - 5);
+      const y = (Math.random() * 10 - 5);
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      requestAnimationFrame(shake);
+    }
+    requestAnimationFrame(shake);
+  } catch {}
+}
 function openCardDetail(id) {
   try {
     const reveal = document.createElement('div'); reveal.className = 'modal-backdrop active-block';
@@ -4931,21 +4959,26 @@ function performDraw(count) {
       try { document.body.removeChild(overlay); } catch {}
       if (picks.length === 1) {
         const c = picks[0]; const id = c.id; const rare = c.rarity; const desc = (CARD_DATA.find(x => x.id === id)?.desc) || '';
-        const reveal = document.createElement('div'); reveal.className = 'modal-backdrop active-block';
-        const modal = document.createElement('div'); modal.className = 'modal';
-        const close = document.createElement('button'); close.className = 'modal-close'; close.type = 'button'; close.textContent = '×'; close.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
-        const title = document.createElement('h2'); title.className = 'modal-title'; title.textContent = '獲得卡片';
-        const card = document.createElement('div'); card.className = 'card3d';
-        const faceFront = document.createElement('div'); faceFront.className = `face front rar-${rare}`; const tip = document.createElement('p'); tip.className = 'dialog-text'; tip.textContent = '點擊翻卡'; faceFront.appendChild(tip);
-        const faceBack = document.createElement('div'); faceBack.className = `face back rar-${rare}`;
-        const imgSrc = getCardImage(id); if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'card-img'; img.onerror = () => { try { faceBack.removeChild(img); } catch {} }; faceBack.appendChild(img); }
-        const info = document.createElement('p'); info.className = 'dialog-text'; info.textContent = `「${getCardName(id)}」｜${rare}${suffix}`; faceBack.appendChild(info);
-        const poem = document.createElement('p'); poem.className = 'dialog-text'; poem.textContent = desc; faceBack.appendChild(poem);
-        card.appendChild(faceFront); card.appendChild(faceBack);
-        attachDrawCardInteractions(card, rare, id, null, true);
-        modal.appendChild(close); modal.appendChild(title); modal.appendChild(card);
-        reveal.appendChild(modal); document.body.appendChild(reveal);
-        if (rare === 'N' || rare === 'R') { setTimeout(() => { card.classList.add('flip'); }, 200); }
+        const needMemFx = (id === 'card_memorial');
+        if (needMemFx) { try { triggerMemorialEffect(); } catch {} }
+        const show = () => {
+          const reveal = document.createElement('div'); reveal.className = 'modal-backdrop active-block';
+          const modal = document.createElement('div'); modal.className = 'modal';
+          const close = document.createElement('button'); close.className = 'modal-close'; close.type = 'button'; close.textContent = '×'; close.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
+          const title = document.createElement('h2'); title.className = 'modal-title'; title.textContent = '獲得卡片';
+          const card = document.createElement('div'); card.className = 'card3d';
+          const faceFront = document.createElement('div'); faceFront.className = `face front rar-${rare}`; const tip = document.createElement('p'); tip.className = 'dialog-text'; tip.textContent = '點擊翻卡'; faceFront.appendChild(tip);
+          const faceBack = document.createElement('div'); faceBack.className = `face back rar-${rare}`;
+          const imgSrc = getCardImage(id); if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'card-img'; img.onerror = () => { try { faceBack.removeChild(img); } catch {} }; faceBack.appendChild(img); }
+          const info = document.createElement('p'); info.className = 'dialog-text'; info.textContent = `「${getCardName(id)}」｜${rare}${suffix}`; faceBack.appendChild(info);
+          const poem = document.createElement('p'); poem.className = 'dialog-text'; poem.textContent = desc; faceBack.appendChild(poem);
+          card.appendChild(faceFront); card.appendChild(faceBack);
+          attachDrawCardInteractions(card, rare, id, null, true);
+          modal.appendChild(close); modal.appendChild(title); modal.appendChild(card);
+          reveal.appendChild(modal); document.body.appendChild(reveal);
+          if (rare === 'N' || rare === 'R') { setTimeout(() => { card.classList.add('flip'); }, 200); }
+        };
+        if (needMemFx) { setTimeout(show, 1000); } else { show(); }
       } else {
         const reveal = document.createElement('div'); reveal.className = 'modal-backdrop active-block';
         const modal = document.createElement('div'); modal.className = 'modal';
