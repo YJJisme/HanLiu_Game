@@ -73,6 +73,7 @@ let currentLetterGoal = 1;
 let blockingModalOpen = false;
 let levelTransitioning = false;
 let customNumberFailText = null;
+let isHintUsedInLevel = false;
 let mismatchCounter = 0;
 let bgmAudio = null;
 let bgmEnabled = true;
@@ -87,24 +88,27 @@ let clickFxEnabled = true;
 
 let userCoins = (() => { try { const v = localStorage.getItem('userCoins'); return v ? Number(v) || 0 : 0; } catch { return 0; } })();
 function saveCoins() { try { localStorage.setItem('userCoins', String(userCoins)); } catch {} }
-function updateCoinsDisplay() { try { if (coinsDisplay) { coinsDisplay.textContent = `貨幣：${userCoins}`; } } catch {} }
+function updateCoinsDisplay() { try { if (coinsDisplay) { coinsDisplay.textContent = devModeEnabled ? '貨幣：∞' : `貨幣：${userCoins}`; } } catch {} }
 function addCoins(n) { const v = Number(n || 0); if (v > 0) { userCoins += v; saveCoins(); updateCoinsDisplay(); } }
 updateCoinsDisplay();
-function showCoinsOnHome() { try { if (coinsDisplay) { coinsDisplay.hidden = false; coinsDisplay.textContent = `貨幣：${userCoins}`; } } catch {} }
+function showCoinsOnHome() { try { if (coinsDisplay) { coinsDisplay.hidden = false; coinsDisplay.textContent = devModeEnabled ? '貨幣：∞' : `貨幣：${userCoins}`; } } catch {} }
 function hideCoins() { try { if (coinsDisplay) coinsDisplay.hidden = true; } catch {} }
 
 let currentLevelMistakes = 0;
 function storageKey(base) { return `hanliu_${devModeEnabled ? 'dev' : 'user'}_${base}`; }
 const CARD_DATA = [
   { id: 'card_exile', name: '夕貶潮州', rarity: 'SR', desc: '一封朝奏九重天，夕貶潮州路八千。被貶潮州前不會死亡；但每關依錯誤次數扣分。' },
-  { id: 'card_all_in', name: '孤注一擲', rarity: 'R', desc: '生命上限變為 1，每關額外 +10 分' },
-  { id: 'card_score_plus', name: '筆力精進', rarity: 'N', desc: '每關額外 +10 分' },
+  { id: 'card_score_plus', name: '筆力精進', rarity: 'N', desc: '加分效果在通關後結算' },
+  { id: 'card_spring', name: '早春小雨', rarity: 'R', desc: '天街小雨潤如酥，草色遙看近卻無。適用關卡顯示「小雨提示」高亮正解；通關後依失誤：完美 +5，失誤 -5。' },
+  { id: 'card_memorial', name: '諫迎佛骨', rarity: 'SSR', desc: '欲為聖明除弊事，肯將衰朽惜殘年！一血挑戰：生命上限 1；每關通關後額外 +10 分。', effectType: 'HARDCORE_SCORE', hpLimit: 1, bonusPerLevel: 10 },
 ];
 function getCardName(id) { const f = CARD_DATA.find(x => x.id === id); return f ? f.name : id; }
 function getCardRarity(id) { const f = CARD_DATA.find(x => x.id === id); return f ? f.rarity : ''; }
 function getCardImage(id) {
   const map = {
     card_exile: 'card_exile.png',
+    card_spring: 'card_spring.png',
+    card_memorial: 'card_memorial.png',
   };
   return map[id] || '';
 }
@@ -176,13 +180,36 @@ function openCardManager() {
   mode.textContent = `模式：${devModeEnabled ? '開發者' : '一般'}｜上限：${devModeEnabled ? '無限制' : '5 張'}`;
   const list = document.createElement('div');
   list.className = 'card-select';
+  const preview = document.createElement('div');
+  preview.className = 'dialog-container';
   const inv = loadInventory();
+  let previewId = '';
+  const renderPreview = () => {
+    preview.innerHTML = '';
+    if (!previewId) { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = '點擊左側卡片以查看詳細'; preview.appendChild(p); return; }
+    const head = document.createElement('h3'); head.className = 'modal-title'; head.textContent = getCardName(previewId);
+    const badge = document.createElement('span'); badge.className = `rar-badge rar-${getCardRarity(previewId)}`; badge.textContent = getCardRarity(previewId); head.appendChild(badge);
+    const imgSrc = getCardImage(previewId);
+    const img = document.createElement('img');
+    img.alt = getCardName(previewId);
+    img.className = 'card-img';
+    if (imgSrc) { img.src = imgSrc; }
+    const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === previewId)?.desc) || '';
+    const actions = document.createElement('div'); actions.className = 'actions';
+    const equipBtn = document.createElement('button'); equipBtn.className = 'button'; equipBtn.type = 'button'; equipBtn.textContent = '裝備'; equipBtn.addEventListener('click', () => { setSelectedCard(previewId); render(); });
+    const unequipBtn = document.createElement('button'); unequipBtn.className = 'button'; unequipBtn.type = 'button'; unequipBtn.textContent = '卸下'; unequipBtn.addEventListener('click', () => { if (selectedCardId === previewId) setSelectedCard(''); render(); });
+    actions.appendChild(equipBtn); actions.appendChild(unequipBtn);
+    preview.appendChild(head);
+    if (imgSrc) preview.appendChild(img);
+    preview.appendChild(desc);
+    preview.appendChild(actions);
+  };
   const render = () => {
     list.innerHTML = '';
     const cur = loadInventory();
     cur.forEach((id) => {
       const row = document.createElement('div');
-      row.className = 'card-item';
+      row.className = `card-item rar-${getCardRarity(id)}`;
       if (id === selectedCardId) row.classList.add('selected');
       const name = document.createElement('span'); name.textContent = `${getCardName(id)}（${getCardRarity(id)}）`;
       const equip = document.createElement('button'); equip.className = 'button'; equip.type = 'button'; equip.textContent = '裝備'; equip.style.marginLeft = '8px';
@@ -196,6 +223,7 @@ function openCardManager() {
         if (selectedCardId === id) setSelectedCard('');
         render();
       });
+      row.addEventListener('click', () => { openInventoryCardDetail(id); });
       row.appendChild(name);
       row.appendChild(equip);
       row.appendChild(del);
@@ -205,6 +233,7 @@ function openCardManager() {
       const empty = document.createElement('p'); empty.className = 'dialog-text'; empty.textContent = '目前尚無卡片';
       list.appendChild(empty);
     }
+    renderPreview();
   };
   render();
   const actions = document.createElement('div'); actions.className = 'actions';
@@ -214,6 +243,7 @@ function openCardManager() {
   modal.appendChild(title);
   modal.appendChild(mode);
   modal.appendChild(list);
+  modal.appendChild(preview);
   modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -698,7 +728,7 @@ function handleError(levelType) {
 }
 
 function goToNextLevel() {
-  levelTransitioning = false;
+  // keep lock during transition to prevent multi-advance on rapid clicks
   systemCleanup(false);
   clearMainContent(true);
   currentLevelIndex += 1;
@@ -708,7 +738,7 @@ function goToNextLevel() {
   if (type === 'Number') currentLevel = item;
   if (type === 'Review') currentLevel = 10;
   applyLevelStyle(type);
-  if (type === 'Number') { currentLevelMistakes = 0; }
+  if (type === 'Number') { currentLevelMistakes = 0; isHintUsedInLevel = false; }
   if (type === 'Number') currentProgress = `Level ${currentLevel}`;
   if (type === 'Dream') currentProgress = 'Dream';
   if (type === 'Review') currentProgress = 'Review';
@@ -721,6 +751,7 @@ function goToNextLevel() {
   } else if (type === 'Review') {
     startReviewLevel();
   }
+  setTimeout(() => { levelTransitioning = false; }, 250);
 }
 
 function startNumberLevel(n) {
@@ -748,7 +779,14 @@ function startNumberLevel(n) {
   next.className = 'button';
   next.type = 'button';
   next.textContent = '下一關';
-  next.addEventListener('click', () => { sec.remove(); goToNextLevel(); });
+  let nextLocked = false;
+  next.addEventListener('click', () => {
+    if (nextLocked) return;
+    nextLocked = true;
+    next.disabled = true;
+    sec.remove();
+    goToNextLevel();
+  });
   sec.appendChild(p);
   sec.appendChild(next);
   main.appendChild(sec);
@@ -776,7 +814,11 @@ function presentLevelIntro(titleText, descriptionText, onStart) {
   startBtn.className = 'button';
   startBtn.type = 'button';
   startBtn.textContent = '開始遊戲';
+  let started = false;
   startBtn.addEventListener('click', () => {
+    if (started) return;
+    started = true;
+    startBtn.disabled = true;
     intro.style.display = 'none';
     if (typeof onStart === 'function') onStart();
   });
@@ -1690,6 +1732,11 @@ function startPoetryLevel() {
     content.className = 'dialog-text';
     content.textContent = q1Poem.full_text;
     level.appendChild(content);
+    const hintBtn = document.createElement('button');
+    hintBtn.className = 'button';
+    hintBtn.type = 'button';
+    hintBtn.textContent = '小雨提示';
+    if (selectedCardId !== 'card_spring') hintBtn.style.display = 'none';
     const options = document.createElement('div');
     options.className = 'options';
     const distractorTitles = shuffleArray(idxs.filter(i => i !== pick[0])).slice(0, 3).map(i => poetryLevelQuestions[i].title);
@@ -1713,6 +1760,14 @@ function startPoetryLevel() {
       options.appendChild(btn);
     });
     level.appendChild(options);
+    hintBtn.addEventListener('click', () => {
+      isHintUsedInLevel = true;
+      hintBtn.style.display = 'none';
+      playSpringHintEffect();
+      const btns = options.querySelectorAll('button.option');
+      btns.forEach(b => { if (b.textContent === q1Poem.title) b.classList.add('hint-green'); });
+    });
+    level.appendChild(hintBtn);
   }
 
   function renderQ2() {
@@ -1728,6 +1783,11 @@ function startPoetryLevel() {
     content.className = 'dialog-text';
     content.innerHTML = clauses.map((c, i) => (i === picked ? `______${c.punct}` : `${c.text}${c.punct}`)).join('');
     level.appendChild(content);
+    const hintBtn = document.createElement('button');
+    hintBtn.className = 'button';
+    hintBtn.type = 'button';
+    hintBtn.textContent = '小雨提示';
+    if (selectedCardId !== 'card_spring') hintBtn.style.display = 'none';
     const options = document.createElement('div');
     options.className = 'options';
     const otherClauses = poetryLevelQuestions.filter(p => p !== q2Poem).flatMap(p => extractClauses(p.full_text).map(x => x.text));
@@ -1741,10 +1801,8 @@ function startPoetryLevel() {
       btn.addEventListener('click', () => {
         const ok = line === clauses[picked].text;
         if (ok) {
-          bumpScore(5);
-          showBlockModal('通關', [
-            { image: 'mengjiao_moon.png', alt: '韓愈與孟郊月下推敲', text: '文成！韓愈與孟郊月下推敲，將一起開創盛唐之後的另一番氣象。' }
-          ], () => { bumpScore(10); level.style.display = 'none'; goToNextLevel(); });
+          const base = 15;
+          applyLevelClear(level, base);
         } else {
           handleError('Number');
           if (errorCount === 1) {
@@ -1756,6 +1814,14 @@ function startPoetryLevel() {
       options.appendChild(btn);
     });
     level.appendChild(options);
+    hintBtn.addEventListener('click', () => {
+      isHintUsedInLevel = true;
+      hintBtn.style.display = 'none';
+      playSpringHintEffect();
+      const btns = options.querySelectorAll('button.option');
+      btns.forEach(b => { if (b.textContent === clauses[picked].text) b.classList.add('hint-green'); });
+    });
+    level.appendChild(hintBtn);
   }
 
   renderQ1();
@@ -3708,14 +3774,34 @@ function renderSentenceQuestion() {
       segBox.appendChild(gap);
     }
   }
+  const hintBtn = document.createElement('button');
+  hintBtn.className = 'button';
+  hintBtn.type = 'button';
+  hintBtn.textContent = '小雨提示';
+  if (selectedCardId !== 'card_spring') hintBtn.style.display = 'none';
   const submitBtn = document.createElement('button');
   submitBtn.className = 'button';
   submitBtn.type = 'button';
   submitBtn.textContent = '提交';
   const msg = document.createElement('p');
   msg.className = 'dialog-text';
+  let submitting = false;
+  hintBtn.addEventListener('click', () => {
+    isHintUsedInLevel = true;
+    hintBtn.style.display = 'none';
+    playSpringHintEffect();
+    const correct = normalizeSegmentation(q.correctSegmentation);
+    const groups = correct.split('/');
+    let pos = 0;
+    for (let i = 0; i < groups.length - 1; i++) {
+      pos += Array.from(groups[i]).length;
+      const gapEl = segBox.querySelector(`.seg-gap[data-index="${pos - 1}"]`);
+      if (gapEl) gapEl.classList.add('hint-green');
+    }
+  });
 
   submitBtn.addEventListener('click', () => {
+    if (submitting) return;
     let built = '';
     for (let i = 0; i < chars.length; i++) {
       built += chars[i];
@@ -3725,16 +3811,18 @@ function renderSentenceQuestion() {
     const user = normalizeSegmentation(built);
     const correct = normalizeSegmentation(q.correctSegmentation);
     if (user && user === correct) {
+      submitting = true;
+      submitBtn.disabled = true;
+      segBox.style.pointerEvents = 'none';
       msg.className = 'dialog-text success-text';
       msg.textContent = '答對！';
       currentQuestionIndex += 1;
       if (currentQuestionIndex >= currentQuestions.length) {
         const pause = document.createElement('p');
         pause.className = 'dialog-text success-text';
-        bumpScore(10);
         pause.textContent = '句讀精準！+10 分，第二關即將開始...';
         level.appendChild(pause);
-        setTimeout(() => { level.style.display = 'none'; goToNextLevel(); }, 1500);
+        applyLevelClear(level, 10);
       } else {
         setTimeout(renderSentenceQuestion, 1500);
       }
@@ -3752,8 +3840,166 @@ function renderSentenceQuestion() {
   level.appendChild(title);
   level.appendChild(prompt);
   level.appendChild(segBox);
+  level.appendChild(hintBtn);
   level.appendChild(submitBtn);
   level.appendChild(msg);
+}
+function playSpringHintEffect() {
+  try {
+    const ov = document.createElement('div');
+    ov.className = 'rain-overlay';
+    document.body.appendChild(ov);
+    setTimeout(() => { try { document.body.removeChild(ov); } catch {} }, 1200);
+  } catch {}
+  try {
+    const a = new Audio('water_drop.mp3');
+    a.volume = Math.min(1, (bgmVolume || 0.6) * 0.8);
+    a.play().catch(() => {});
+  } catch {}
+}
+function openCardDetail(id) {
+  try {
+    const reveal = document.createElement('div'); reveal.className = 'modal-backdrop active-block';
+    const modal = document.createElement('div'); modal.className = 'modal';
+    const close = document.createElement('button'); close.className = 'modal-close'; close.type = 'button'; close.textContent = '×'; close.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
+    const title = document.createElement('h2'); title.className = 'modal-title'; title.textContent = getCardName(id);
+    const imgSrc = getCardImage(id);
+    if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'detail-img'; img.onerror = () => { try { modal.removeChild(img); } catch {} }; modal.appendChild(img); }
+    const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === id)?.desc) || '';
+    modal.appendChild(close); modal.appendChild(title); if (imgSrc) modal.appendChild(desc); else modal.appendChild(desc);
+    reveal.appendChild(modal); document.body.appendChild(reveal);
+  } catch {}
+}
+function refreshOpenCardManager() {
+  const list = document.querySelector('.card-select');
+  if (!list) return;
+  const rows = list.querySelectorAll('.card-item');
+  rows.forEach(r => {
+    const nameEl = r.querySelector('span');
+    if (!nameEl) return;
+    const text = nameEl.textContent || '';
+    const id = CARD_DATA.find(c => text.includes(c.name))?.id || '';
+    if (!id) return;
+    if (id === selectedCardId) r.classList.add('selected'); else r.classList.remove('selected');
+  });
+}
+function openInventoryCardDetail(id) {
+  try {
+    const reveal = document.createElement('div'); reveal.className = 'modal-backdrop active-block';
+    const modal = document.createElement('div'); modal.className = 'modal';
+    const close = document.createElement('button'); close.className = 'modal-close'; close.type = 'button'; close.textContent = '×'; close.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
+    const title = document.createElement('h2'); title.className = 'modal-title'; title.textContent = getCardName(id);
+    const badge = document.createElement('span'); badge.className = `rar-badge rar-${getCardRarity(id)}`; badge.textContent = getCardRarity(id); title.appendChild(badge);
+    const status = document.createElement('p'); status.className = 'dialog-text'; status.textContent = (selectedCardId === id) ? '狀態：已裝備' : '狀態：未裝備';
+    const imgSrc = getCardImage(id);
+    if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'detail-img'; img.onerror = () => { try { modal.removeChild(img); } catch {} }; modal.appendChild(img); }
+    const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === id)?.desc) || '';
+    const warn = document.createElement('p'); warn.className = 'dialog-text'; warn.textContent = '提醒：使用後卡片將消失（消耗品）。';
+    const actions = document.createElement('div'); actions.className = 'actions';
+    const equipBtn = document.createElement('button'); equipBtn.className = 'button'; equipBtn.type = 'button'; equipBtn.textContent = '裝備'; equipBtn.addEventListener('click', () => { setSelectedCard(id); status.textContent = '狀態：已裝備'; refreshOpenCardManager(); });
+    const unequipBtn = document.createElement('button'); unequipBtn.className = 'button'; unequipBtn.type = 'button'; unequipBtn.textContent = '卸下'; unequipBtn.addEventListener('click', () => { if (selectedCardId === id) setSelectedCard(''); status.textContent = '狀態：未裝備'; refreshOpenCardManager(); });
+    actions.appendChild(equipBtn); actions.appendChild(unequipBtn);
+    modal.appendChild(close); modal.appendChild(title); modal.appendChild(status); if (imgSrc) modal.appendChild(desc); else modal.appendChild(desc); modal.appendChild(warn); modal.appendChild(actions);
+    reveal.appendChild(modal); document.body.appendChild(reveal);
+  } catch {}
+}
+function openPreEquipModal(onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '出發前裝備';
+  const status = document.createElement('p');
+  status.className = 'dialog-text';
+  status.textContent = selectedCardId ? `目前裝備：${getCardName(selectedCardId)}（${getCardRarity(selectedCardId)}）` : '目前裝備：無';
+  const list = document.createElement('div');
+  list.className = 'card-select';
+  const preview = document.createElement('div');
+  preview.className = 'dialog-container';
+  const renderPreview = (id) => {
+    preview.innerHTML = '';
+    if (!id) { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = '未選擇卡片'; preview.appendChild(p); return; }
+    const head = document.createElement('h3'); head.className = 'modal-title'; head.textContent = getCardName(id);
+    const badge = document.createElement('span'); badge.className = `rar-badge rar-${getCardRarity(id)}`; badge.textContent = getCardRarity(id); head.appendChild(badge);
+    const imgSrc = getCardImage(id);
+    if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'card-img'; preview.appendChild(img); }
+    const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === id)?.desc) || '';
+    const warn = document.createElement('p'); warn.className = 'dialog-text'; warn.textContent = '提醒：使用後卡片將消失（消耗品）。';
+    const actions = document.createElement('div'); actions.className = 'actions';
+    const equipBtn = document.createElement('button'); equipBtn.className = 'button'; equipBtn.type = 'button'; equipBtn.textContent = '裝備'; equipBtn.addEventListener('click', () => { setSelectedCard(id); status.textContent = `目前裝備：${getCardName(selectedCardId)}（${getCardRarity(selectedCardId)}）`; });
+    const unequipBtn = document.createElement('button'); unequipBtn.className = 'button'; unequipBtn.type = 'button'; unequipBtn.textContent = '不裝備'; unequipBtn.addEventListener('click', () => { setSelectedCard(''); status.textContent = '目前裝備：無'; });
+    actions.appendChild(equipBtn); actions.appendChild(unequipBtn);
+    preview.appendChild(head); if (imgSrc) preview.appendChild(img); preview.appendChild(desc); preview.appendChild(warn); preview.appendChild(actions);
+  };
+  const inv = loadInventory();
+  list.innerHTML = '';
+  inv.forEach((id) => {
+    const row = document.createElement('div');
+    row.className = `card-item rar-${getCardRarity(id)}`;
+    if (id === selectedCardId) row.classList.add('selected');
+    const name = document.createElement('span'); name.textContent = `${getCardName(id)}（${getCardRarity(id)}）`;
+    row.appendChild(name);
+    row.addEventListener('click', () => { renderPreview(id); });
+    list.appendChild(row);
+  });
+  if (!inv.length) { const empty = document.createElement('p'); empty.className = 'dialog-text'; empty.textContent = '目前尚無卡片'; list.appendChild(empty); }
+  renderPreview(selectedCardId || (inv[0] || ''));
+  const actions = document.createElement('div'); actions.className = 'actions';
+  const confirmBtn = document.createElement('button'); confirmBtn.className = 'button'; confirmBtn.type = 'button'; confirmBtn.textContent = '確定開始'; confirmBtn.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} if (typeof onConfirm === 'function') onConfirm(); });
+  const cancelBtn = document.createElement('button'); cancelBtn.className = 'button'; cancelBtn.type = 'button'; cancelBtn.textContent = '返回'; cancelBtn.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  actions.appendChild(confirmBtn); actions.appendChild(cancelBtn);
+  modal.appendChild(close); modal.appendChild(title); modal.appendChild(status); modal.appendChild(list); modal.appendChild(preview); modal.appendChild(actions);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+}
+function attachDrawCardInteractions(container, rarity, id, onShowComplete, noFlipBack = false) {
+  let flipped = false;
+  let userInteracted = false;
+  let longPressed = false;
+  let lpTimer = null;
+  let autoFlipTimer = null;
+  let autoNextTimer = null;
+  function scheduleAutoFlip() {
+    if (rarity === 'N' || rarity === 'R') {
+      autoFlipTimer = setTimeout(() => {
+        if (!userInteracted && !flipped) {
+          container.classList.add('flip'); flipped = true;
+          scheduleAutoNext();
+        }
+      }, 1000);
+    }
+  }
+  function scheduleAutoNext() {
+    if (typeof onShowComplete === 'function') {
+      autoNextTimer = setTimeout(() => { try { onShowComplete(); } catch {} }, 5000);
+    }
+  }
+  container.addEventListener('pointerdown', () => {
+    userInteracted = true;
+    lpTimer = setTimeout(() => { longPressed = true; openCardDetail(id); }, 600);
+  });
+  function clearLp() { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }
+  container.addEventListener('pointerup', () => {
+    clearLp();
+    if (!longPressed) {
+      if (noFlipBack) {
+        if (!flipped) { container.classList.add('flip'); flipped = true; scheduleAutoNext(); }
+      } else {
+        container.classList.toggle('flip');
+        flipped = container.classList.contains('flip');
+        if (flipped) scheduleAutoNext();
+      }
+    }
+    longPressed = false;
+  });
+  container.addEventListener('pointerleave', clearLp);
+  scheduleAutoFlip();
 }
 
 const quanxueSegments = [
@@ -4408,36 +4654,38 @@ function start() {
   const playerName = devModeEnabled ? '開發者' : input.value.trim();
   if (!playerName) { input.focus(); return; }
   localStorage.setItem('hanliu_player_name', playerName);
-  const startScreen = document.getElementById('startScreen');
-  startScreen.style.display = 'none';
-  hideCoins();
-  isGameOver = false;
-  systemCleanup(false);
-  try {
-    Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
-    Array.from(document.querySelectorAll('.flash-overlay')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
-    const baseBackdrop = document.getElementById('modalBackdrop');
-    if (baseBackdrop) baseBackdrop.hidden = true;
-    blockingModalOpen = false;
-  } catch {}
-  matchScore = 0;
-  orderFailed = false;
-  lastRunId = null;
-  customNumberFailText = null;
-  currentLevel = 1;
-  currentLevelIndex = -1;
-  cloudSyncDisabled = false;
-  document.documentElement.style.removeProperty('--bg-image');
-  document.documentElement.style.removeProperty('--bg-overlay');
-  document.documentElement.style.removeProperty('--bg-overlay');
-  const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
-  const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = true;
-  const hv = document.getElementById('homeVolume'); if (hv) hv.hidden = true;
-  const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
-  const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
-  if (selectedCardId === 'card_all_in') { hpMax = 1; } else { hpMax = 2; }
-  resetHpBar();
-  createDialogContainer(playerName);
+  openPreEquipModal(() => {
+    const startScreen = document.getElementById('startScreen');
+    startScreen.style.display = 'none';
+    hideCoins();
+    isGameOver = false;
+    systemCleanup(false);
+    try {
+      Array.from(document.querySelectorAll('.modal-backdrop.active-block')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
+      Array.from(document.querySelectorAll('.flash-overlay')).forEach(el => { try { document.body.removeChild(el); } catch { el.remove(); } });
+      const baseBackdrop = document.getElementById('modalBackdrop');
+      if (baseBackdrop) baseBackdrop.hidden = true;
+      blockingModalOpen = false;
+    } catch {}
+    matchScore = 0;
+    orderFailed = false;
+    lastRunId = null;
+    customNumberFailText = null;
+    currentLevel = 1;
+    currentLevelIndex = -1;
+    cloudSyncDisabled = false;
+    document.documentElement.style.removeProperty('--bg-image');
+    document.documentElement.style.removeProperty('--bg-overlay');
+    document.documentElement.style.removeProperty('--bg-overlay');
+    const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
+    const fb = document.getElementById('feedback-btn'); if (fb) fb.hidden = true;
+    const hv = document.getElementById('homeVolume'); if (hv) hv.hidden = true;
+    const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
+    const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
+    hpMax = (selectedCardId === 'card_memorial' ? 1 : 2);
+    resetHpBar();
+    createDialogContainer(playerName);
+  });
 }
 
 function todayString() {
@@ -4543,6 +4791,7 @@ function handleDrawCard() {
           const img = document.createElement('img');
           img.src = imgSrc;
           img.alt = getCardName(id);
+          img.className = 'card-img';
           img.onerror = () => { try { faceBack.removeChild(img); } catch {} };
           faceBack.appendChild(img);
         }
@@ -4557,27 +4806,12 @@ function handleDrawCard() {
         card.appendChild(faceFront);
         card.appendChild(faceBack);
         card.addEventListener('click', () => { card.classList.toggle('flip'); });
-        const actions = document.createElement('div');
-        actions.className = 'actions';
-        const equipBtn = document.createElement('button');
-        equipBtn.className = 'button';
-        equipBtn.type = 'button';
-        equipBtn.textContent = '裝備此卡';
-        equipBtn.addEventListener('click', () => { setSelectedCard(id); try { document.body.removeChild(reveal); } catch {} });
-        actions.appendChild(equipBtn);
-        const okBtn = document.createElement('button');
-        okBtn.className = 'button';
-        okBtn.type = 'button';
-        okBtn.textContent = '關閉';
-        okBtn.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
-        actions.appendChild(okBtn);
         modal.appendChild(close);
         modal.appendChild(title);
         modal.appendChild(card);
-        modal.appendChild(actions);
         reveal.appendChild(modal);
         document.body.appendChild(reveal);
-        setTimeout(() => { card.classList.add('flip'); }, 200);
+        if (rare === 'N' || rare === 'R') { setTimeout(() => { card.classList.add('flip'); }, 200); }
       }, 1500);
     } else {
       showBlockModal('提示', [{ text: '貨幣不足' }], () => {});
@@ -4704,16 +4938,14 @@ function performDraw(count) {
         const card = document.createElement('div'); card.className = 'card3d';
         const faceFront = document.createElement('div'); faceFront.className = `face front rar-${rare}`; const tip = document.createElement('p'); tip.className = 'dialog-text'; tip.textContent = '點擊翻卡'; faceFront.appendChild(tip);
         const faceBack = document.createElement('div'); faceBack.className = `face back rar-${rare}`;
-        const imgSrc = getCardImage(id); if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.onerror = () => { try { faceBack.removeChild(img); } catch {} }; faceBack.appendChild(img); }
+        const imgSrc = getCardImage(id); if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'card-img'; img.onerror = () => { try { faceBack.removeChild(img); } catch {} }; faceBack.appendChild(img); }
         const info = document.createElement('p'); info.className = 'dialog-text'; info.textContent = `「${getCardName(id)}」｜${rare}${suffix}`; faceBack.appendChild(info);
         const poem = document.createElement('p'); poem.className = 'dialog-text'; poem.textContent = desc; faceBack.appendChild(poem);
-        card.appendChild(faceFront); card.appendChild(faceBack); card.addEventListener('click', () => { card.classList.toggle('flip'); });
-        const actions = document.createElement('div'); actions.className = 'actions';
-        const equipBtn = document.createElement('button'); equipBtn.className = 'button'; equipBtn.type = 'button'; equipBtn.textContent = '裝備此卡'; equipBtn.addEventListener('click', () => { setSelectedCard(id); try { document.body.removeChild(reveal); } catch {} });
-        const okBtn = document.createElement('button'); okBtn.className = 'button'; okBtn.type = 'button'; okBtn.textContent = '關閉'; okBtn.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
-        actions.appendChild(equipBtn); actions.appendChild(okBtn);
-        modal.appendChild(close); modal.appendChild(title); modal.appendChild(card); modal.appendChild(actions);
-        reveal.appendChild(modal); document.body.appendChild(reveal); setTimeout(() => { card.classList.add('flip'); }, 200);
+        card.appendChild(faceFront); card.appendChild(faceBack);
+        attachDrawCardInteractions(card, rare, id, null, true);
+        modal.appendChild(close); modal.appendChild(title); modal.appendChild(card);
+        reveal.appendChild(modal); document.body.appendChild(reveal);
+        if (rare === 'N' || rare === 'R') { setTimeout(() => { card.classList.add('flip'); }, 200); }
       } else {
         const reveal = document.createElement('div'); reveal.className = 'modal-backdrop active-block';
         const modal = document.createElement('div'); modal.className = 'modal';
@@ -4730,7 +4962,7 @@ function performDraw(count) {
           const faceBack = document.createElement('div'); faceBack.className = `face back rar-${c.rarity}`;
           const imgSrc = getCardImage(c.id);
           if (imgSrc) {
-            const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(c.id);
+            const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(c.id); img.className = 'card-img';
             img.onerror = () => { try { faceBack.removeChild(img); } catch {} };
             faceBack.appendChild(img);
           }
@@ -4738,34 +4970,21 @@ function performDraw(count) {
           const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === c.id)?.desc) || '';
           faceBack.appendChild(info); faceBack.appendChild(desc);
           container.appendChild(faceFront); container.appendChild(faceBack);
-          container.addEventListener('click', () => { container.classList.toggle('flip'); });
-          setTimeout(() => { container.classList.add('flip'); }, 200);
+          attachDrawCardInteractions(container, c.rarity, c.id, () => { nextCard(); }, true);
           return container;
         };
+        function nextCard() {
+          try { wrap.querySelector('.card3d') && wrap.removeChild(wrap.querySelector('.card3d')); } catch {}
+          cur += 1;
+          if (cur >= picks.length) { try { document.body.removeChild(reveal); } catch {} return; }
+          indexText.textContent = `${cur + 1} / ${picks.length}`;
+          wrap.appendChild(buildCard(picks[cur]));
+        }
         let cardEl = buildCard(picks[cur]);
         indexText.textContent = `${cur + 1} / ${picks.length}`;
         wrap.appendChild(indexText);
         wrap.appendChild(cardEl);
-        const actions = document.createElement('div'); actions.className = 'actions';
-        const prevBtn = document.createElement('button'); prevBtn.className = 'button'; prevBtn.type = 'button'; prevBtn.textContent = '上一張';
-        const nextBtn = document.createElement('button'); nextBtn.className = 'button'; nextBtn.type = 'button'; nextBtn.textContent = '下一張';
-        const equipBtn = document.createElement('button'); equipBtn.className = 'button'; equipBtn.type = 'button'; equipBtn.textContent = '裝備當前';
-        const okBtn = document.createElement('button'); okBtn.className = 'button'; okBtn.type = 'button'; okBtn.textContent = '關閉';
-        const refresh = () => {
-          try { wrap.removeChild(cardEl); } catch {}
-          cardEl = buildCard(picks[cur]);
-          wrap.appendChild(cardEl);
-          indexText.textContent = `${cur + 1} / ${picks.length}`;
-        };
-        prevBtn.addEventListener('click', () => { if (cur > 0) { cur -= 1; refresh(); } });
-        nextBtn.addEventListener('click', () => { if (cur < picks.length - 1) { cur += 1; refresh(); } });
-        equipBtn.addEventListener('click', () => { const c = picks[cur]; setSelectedCard(c.id); });
-        okBtn.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
-        actions.appendChild(prevBtn);
-        actions.appendChild(nextBtn);
-        actions.appendChild(equipBtn);
-        actions.appendChild(okBtn);
-        modal.appendChild(close); modal.appendChild(title); modal.appendChild(wrap); modal.appendChild(actions);
+        modal.appendChild(close); modal.appendChild(title); modal.appendChild(wrap);
         reveal.appendChild(modal); document.body.appendChild(reveal);
       }
     }, 1500);
@@ -4913,10 +5132,12 @@ function showHpBar() {
   const bar = document.getElementById('hpBar');
   if (bar) bar.hidden = false;
   if (bar) {
+    bar.classList.toggle('hardcore', selectedCardId === 'card_memorial');
     let playerLabel = bar.querySelector('#playerLabel');
     let playerNameText = bar.querySelector('#playerNameText');
     let scoreLabel = bar.querySelector('#scoreLabel');
     let scoreText = bar.querySelector('#scoreText');
+    let hardcoreBadge = bar.querySelector('#hardcoreBadge');
     if (!scoreLabel) {
       scoreLabel = document.createElement('span');
       scoreLabel.id = 'scoreLabel';
@@ -4944,6 +5165,19 @@ function showHpBar() {
       scoreText.className = 'hp-text';
       scoreText.textContent = String(matchScore || 0);
       bar.appendChild(scoreText);
+    }
+    if (selectedCardId === 'card_memorial') {
+      if (!hardcoreBadge) {
+        hardcoreBadge = document.createElement('span');
+        hardcoreBadge.id = 'hardcoreBadge';
+        hardcoreBadge.className = 'hp-badge';
+        hardcoreBadge.textContent = '一血挑戰中';
+        bar.appendChild(hardcoreBadge);
+      } else {
+        hardcoreBadge.hidden = false;
+      }
+    } else if (hardcoreBadge) {
+      hardcoreBadge.hidden = true;
     }
     let bgmBtn = bar.querySelector('#bgmToggle');
     if (!bgmBtn) {
@@ -5014,10 +5248,24 @@ function applyLevelClear(levelEl, baseScore) {
     return p;
   };
   const penalty = exileEquipped ? computeExilePenalty() : 0;
-  const gain = Math.max(0, Number(baseScore || 0) + bonus - penalty);
+  let gain = Math.max(0, Number(baseScore || 0) + bonus - penalty);
+  let hintMsg = '';
+  let hintPositive = false;
+  if (selectedCardId === 'card_spring' && isHintUsedInLevel) {
+    if (currentLevelMistakes === 0) { gain += 5; hintMsg = '雨潤如酥：完美答對，分數+5'; hintPositive = true; }
+    else { gain = Math.max(0, gain - 5); hintMsg = '草色卻無：使用提示後失誤，分數-5'; hintPositive = false; }
+  }
+  if (selectedCardId === 'card_memorial') {
+    gain += 10;
+    hintMsg = hintMsg ? (hintMsg + '｜殘年除弊：額外獲得 +10 分') : '殘年除弊：額外獲得 +10 分';
+  }
   bumpScore(gain);
   if (levelEl) { levelEl.style.display = 'none'; levelEl.style.pointerEvents = 'none'; }
-  goToNextLevel();
+  if (hintMsg) {
+    showBlockModal('提示', [{ text: hintMsg }], () => { goToNextLevel(); });
+  } else {
+    goToNextLevel();
+  }
 }
 function consumeCard() {
   if (!selectedCardId) return;
