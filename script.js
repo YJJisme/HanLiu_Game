@@ -5075,14 +5075,17 @@ if (rankImportBtn) rankImportBtn.addEventListener('click', () => { if (rankFileI
 if (rankFileInput) rankFileInput.addEventListener('change', importLeaderboard);
 if (aboutBtn) aboutBtn.addEventListener('click', openAbout);
 const aboutParent = aboutBtn ? aboutBtn.parentElement : null;
-if (aboutParent) {
-  const galleryBtn = document.createElement('button');
-  galleryBtn.id = 'galleryBtn';
-  galleryBtn.className = 'button';
-  galleryBtn.type = 'button';
-  galleryBtn.textContent = '圖鑑';
-  galleryBtn.addEventListener('click', openGallery);
-  aboutParent.appendChild(galleryBtn);
+{
+  const host = aboutParent || document.querySelector('#startScreen .actions');
+  if (host) {
+    const galleryBtn = document.createElement('button');
+    galleryBtn.id = 'galleryBtn';
+    galleryBtn.className = 'button';
+    galleryBtn.type = 'button';
+    galleryBtn.textContent = '圖鑑';
+    galleryBtn.addEventListener('click', openGallery);
+    host.appendChild(galleryBtn);
+  }
 }
 if (debugStartBtn) debugStartBtn.addEventListener('click', () => {
   if (!devModeEnabled) {
