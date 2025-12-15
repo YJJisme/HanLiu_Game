@@ -10,7 +10,6 @@ const rankAll = document.getElementById('rankAll');
 const aboutBtn = document.getElementById('aboutBtn');
 const debugLevelInput = document.getElementById('debugLevelInput');
 const debugStartBtn = document.getElementById('debugStartBtn');
-const dailyCheckInBtn = document.getElementById('dailyCheckInBtn');
 const drawCardBtn = document.getElementById('drawCardBtn');
 const coinsDisplay = document.getElementById('coinsDisplay');
 const selectCardArea = document.getElementById('selectCardArea');
@@ -25,13 +24,24 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.22';
+let appVersion = '1.30';
 let releaseNotes = [
-  '體驗優化與細節改進',
-  '修正多項介面與邏輯一致性',
-  '文字與可讀性微調'
+  '卡牌系統正式實裝：抽卡、背包、裝備、展示',
+  '圖鑑分組與永久解鎖：結算／場景／事件／卡片',
+  '登入頁隱藏貨幣；主頁顯示並長按提示獲取方式',
+  '每日首次登入自動簽到與月曆打勾；連續 5 天 +5',
+  '新帳號首次登入贈送免費一抽（遊客不適用）',
+  '開發者模式顯示無限貨幣'
 ];
 let releaseHistory = {
+  '1.30': [
+    '卡牌系統正式實裝：抽卡、背包、裝備、展示',
+    '圖鑑分組與永久解鎖：結算／場景／事件／卡片',
+    '登入頁隱藏貨幣；主頁顯示並長按提示獲取方式',
+    '每日首次登入自動簽到與月曆打勾；連續 5 天 +5',
+    '新帳號首次登入贈送免費一抽（遊客不適用）',
+    '開發者模式顯示無限貨幣'
+  ],
   '1.22': [
     '介面體驗優化與穩定性改善',
     '排行榜與設定流程調整',
@@ -86,17 +96,81 @@ let cloudSyncDisabled = false;
 let lastRunId = null;
 let clickFxEnabled = true;
 
-let userCoins = (() => { try { const v = localStorage.getItem('userCoins'); return v ? Number(v) || 0 : 0; } catch { return 0; } })();
-function saveCoins() { try { localStorage.setItem('userCoins', String(userCoins)); } catch {} }
+function getCoinsKey() {
+  try {
+    if (devModeEnabled) return 'hanliu_dev_coins';
+    if (isAccountBound()) {
+      const acc = getStoredAccount();
+      const id = acc && acc.id ? String(acc.id) : 'guest';
+      return `hanliu_acc_${id}_coins`;
+    }
+    return 'hanliu_guest_coins';
+  } catch { return 'hanliu_guest_coins'; }
+}
+let userCoins = (() => { try { const v = localStorage.getItem(getCoinsKey()); return v ? Number(v) || 0 : 0; } catch { return 0; } })();
+let __profileSyncTimer = null;
+function scheduleProfileSync() {
+  try {
+    if (!isAccountBound()) return;
+    if (__profileSyncTimer) { clearTimeout(__profileSyncTimer); __profileSyncTimer = null; }
+    __profileSyncTimer = setTimeout(() => { try { syncProfileToCloud(buildProfileFromLocal()); } catch {} }, 400);
+  } catch {}
+}
+function saveCoins() { try { localStorage.setItem(getCoinsKey(), String(userCoins)); } catch {} scheduleProfileSync(); }
 function updateCoinsDisplay() { try { if (coinsDisplay) { coinsDisplay.textContent = devModeEnabled ? '貨幣：∞' : `貨幣：${userCoins}`; } } catch {} }
 function addCoins(n) { const v = Number(n || 0); if (v > 0) { userCoins += v; saveCoins(); updateCoinsDisplay(); } }
+function reloadCoins() { try { userCoins = Number(localStorage.getItem(getCoinsKey()) || 0) || 0; updateCoinsDisplay(); } catch {} }
 updateCoinsDisplay();
+let isFirstLoginFreeDraw = false;
 function showCoinsOnHome() { try { if (coinsDisplay) { coinsDisplay.hidden = false; coinsDisplay.textContent = devModeEnabled ? '貨幣：∞' : `貨幣：${userCoins}`; } } catch {} }
 function hideCoins() { try { if (coinsDisplay) coinsDisplay.hidden = true; } catch {} }
+function openCoinsHelp() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '貨幣獲取方法';
+  const a = document.createElement('p'); a.className = 'dialog-text'; a.textContent = '每日領賞：每日首次領取 +1';
+  const b = document.createElement('p'); b.className = 'dialog-text'; b.textContent = '結算換算：分數 ÷ 100 向下取整（一次一局）';
+  const c = document.createElement('p'); c.className = 'dialog-text'; c.textContent = '特殊事件：部分稀有事件可能贈送';
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(a);
+  modal.appendChild(b);
+  modal.appendChild(c);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+(() => {
+  if (!coinsDisplay) return;
+  let t = null;
+  const start = () => { try { clearTimeout(t); } catch {} t = setTimeout(openCoinsHelp, 650); };
+  const cancel = () => { try { clearTimeout(t); } catch {} t = null; };
+  coinsDisplay.addEventListener('pointerdown', start);
+  coinsDisplay.addEventListener('pointerup', cancel);
+  coinsDisplay.addEventListener('pointerleave', cancel);
+  coinsDisplay.addEventListener('touchstart', start);
+  coinsDisplay.addEventListener('touchend', cancel);
+})();
 
 let currentLevelMistakes = 0;
 let dreamGambleActive = false;
-function storageKey(base) { return `hanliu_${devModeEnabled ? 'dev' : 'user'}_${base}`; }
+function storageKey(base) {
+  if (devModeEnabled) return `hanliu_dev_${base}`;
+  if (isAccountBound()) {
+    const acc = getStoredAccount();
+    const id = acc && acc.id ? String(acc.id) : 'guest';
+    return `hanliu_acc_${id}_${base}`;
+  }
+  return `hanliu_guest_${base}`;
+}
 const CARD_DATA = [
   { id: 'card_exile', name: '夕貶潮州', rarity: 'SR', desc: '一封朝奏九重天，夕貶潮州路八千。被貶潮州前不會死亡；但每關依錯誤次數扣分。' },
   { id: 'card_dream', name: '莊周夢蝶', rarity: 'N', desc: '莫憂世事兼身事，須著人間比夢間。作夢關卡可選擇觸發，使稀有事件發生機率提高 10%；攜帶出征即視同使用，該局結算扣除。' },
@@ -126,14 +200,10 @@ function drawCard() {
   return pick;
 }
 function loadInventory() { try { const raw = localStorage.getItem(storageKey('inventory')); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; } }
-function saveInventory(list) { try { localStorage.setItem(storageKey('inventory'), JSON.stringify(list || [])); } catch {} }
+function saveInventory(list) { try { localStorage.setItem(storageKey('inventory'), JSON.stringify(list || [])); } catch {} scheduleProfileSync(); }
 let selectedCardId = (() => { try { return localStorage.getItem(storageKey('selected_card')) || ''; } catch { return ''; } })();
-function setSelectedCard(id) { selectedCardId = id || ''; try { localStorage.setItem(storageKey('selected_card'), selectedCardId); } catch {} renderSelectCardArea(); if (equipExileCard) equipExileCard.checked = (selectedCardId === 'card_exile'); }
-function ensureDefaultExileCard() {
-  const inv = loadInventory();
-  if (!inv.includes('card_exile')) { inv.push('card_exile'); saveInventory(inv); }
-}
-ensureDefaultExileCard();
+function setSelectedCard(id) { selectedCardId = id || ''; try { localStorage.setItem(storageKey('selected_card'), selectedCardId); } catch {} renderSelectCardArea(); if (equipExileCard) equipExileCard.checked = (selectedCardId === 'card_exile'); scheduleProfileSync(); }
+function ensureDefaultExileCard() {}
 function renderSelectCardArea() {
   if (!selectCardArea) return;
   const inv = loadInventory();
@@ -3028,9 +3098,10 @@ function navigateHome() {
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = false;
   const hv = document.getElementById('homeVolume'); if (hv) { hv.classList.remove('is-visible'); hv.hidden = true; hv.value = String(Math.round((getStoredVolume() || 0.35) * 100)); }
   const hsv = document.getElementById('homeSfxVolume'); if (hsv) { hsv.classList.remove('is-visible'); hsv.hidden = true; hsv.value = String(Math.round((getStoredSfxVolume() || 0.6) * 100)); }
-  updateCoinsDisplay();
+  reloadCoins();
   showCoinsOnHome();
   renderSelectCardArea();
+  performAutoDailyCheckIn();
 }
 
 function openNotice() {
@@ -4746,20 +4817,89 @@ function todayString() {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function handleDailyCheckIn() {
-  try {
-    const last = localStorage.getItem('lastCheckInDate') || '';
-    const today = todayString();
-    if (last !== today) {
-      localStorage.setItem('lastCheckInDate', today);
-      addCoins(1);
-      showBlockModal('提示', [{ text: '獲得 1 個貨幣！' }], () => {});
-    } else {
-      showBlockModal('提示', [{ text: '今日已領取' }], () => {});
+function getLoginDays() { try { const raw = localStorage.getItem(storageKey('login_days')) || '[]'; const arr = JSON.parse(raw); return Array.isArray(arr) ? arr : []; } catch { return []; } }
+function saveLoginDays(arr) { try { localStorage.setItem(storageKey('login_days'), JSON.stringify(Array.isArray(arr) ? arr : [])); } catch {} scheduleProfileSync(); }
+function countMonthlyLogins(arr, ym) { return (Array.isArray(arr) ? arr : []).filter(d => String(d || '').startsWith(ym + '-')).length; }
+function getYesterdayString() { const d = new Date(); d.setDate(d.getDate() - 1); const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
+function computeConsecutiveStreak(days) { const set = new Set(Array.isArray(days) ? days : []); let streak = 0; let d = new Date(); while (true) { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const key = `${y}-${m}-${day}`; if (set.has(key)) { streak += 1; d.setDate(d.getDate() - 1); } else { break; } } return streak; }
+function openSignInModal(message, ym, days) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '簽到成功';
+  const info = document.createElement('p');
+  info.className = 'dialog-text';
+  info.textContent = message || '';
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+  grid.style.gap = '6px';
+  grid.style.marginTop = '0.5rem';
+  const week = ['日','一','二','三','四','五','六'];
+  week.forEach((w) => { const h = document.createElement('div'); h.className = 'dialog-text'; h.style.textAlign = 'center'; h.style.fontWeight = '900'; h.textContent = w; grid.appendChild(h); });
+  const parts = String(ym).split('-'); const yy = parseInt(parts[0], 10); const mm = parseInt(parts[1], 10) - 1;
+  const first = new Date(yy, mm, 1); const startWd = first.getDay(); const last = new Date(yy, mm + 1, 0); const dayCount = last.getDate();
+  for (let i = 0; i < startWd; i++) { const s = document.createElement('div'); grid.appendChild(s); }
+  const set = new Set(Array.isArray(days) ? days : []);
+  const today = todayString();
+  for (let d = 1; d <= dayCount; d++) {
+    const cell = document.createElement('div');
+    cell.style.border = '1px solid #2a2a2a';
+    cell.style.borderRadius = '8px';
+    cell.style.padding = '6px';
+    cell.style.display = 'flex';
+    cell.style.alignItems = 'center';
+    cell.style.justifyContent = 'center';
+    cell.style.position = 'relative';
+    const label = document.createElement('span'); label.className = 'dialog-text'; label.textContent = String(d);
+    const key = `${ym}-${String(d).padStart(2, '0')}`;
+    if (set.has(key)) { cell.style.background = 'linear-gradient(180deg, #263238, #0f1a24)'; label.style.color = '#cfe9f3'; }
+    if (set.has(key)) {
+      const mark = document.createElement('span');
+      mark.className = 'dialog-text';
+      mark.textContent = '✓';
+      mark.style.position = 'absolute';
+      mark.style.top = '4px';
+      mark.style.right = '6px';
+      mark.style.color = key === today ? '#9be7ff' : '#6ea3b5';
+      mark.style.fontWeight = '900';
+      cell.appendChild(mark);
     }
-  } catch {
-    showBlockModal('提示', [{ text: '發生錯誤，稍後再試' }], () => {});
+    cell.appendChild(label);
+    grid.appendChild(cell);
   }
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(info);
+  modal.appendChild(grid);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+function performAutoDailyCheckIn() {
+  try {
+    const today = todayString();
+    const last = localStorage.getItem(storageKey('lastCheckInDate')) || '';
+    if (last === today) return;
+    localStorage.setItem(storageKey('lastCheckInDate'), today);
+    const days = getLoginDays();
+    if (!days.includes(today)) { days.push(today); saveLoginDays(days); }
+    addCoins(1);
+    const ym = today.slice(0, 7);
+    const mcount = countMonthlyLogins(days, ym);
+    const total = days.length;
+    const streak = computeConsecutiveStreak(days);
+    let text = `簽到成功：+1 貨幣｜連續 ${streak} 天｜本月 ${mcount} 天｜累計 ${total} 天`;
+    if (streak > 0 && streak % 5 === 0) { addCoins(5); text += '｜連續 5 天獎勵 +5'; }
+    openSignInModal(text, ym, days);
+  } catch {}
 }
 function handleDrawCard() {
   try {
@@ -4949,7 +5089,7 @@ function openDrawPrompt() {
 }
 function performDraw(count) {
   try {
-    const cost = devModeEnabled ? 0 : 10 * count;
+    const cost = (devModeEnabled || isFirstLoginFreeDraw) ? 0 : 10 * count;
     const invBefore = loadInventory();
     if (!devModeEnabled && invBefore.length + count > 5) {
       const free = Math.max(0, 5 - invBefore.length);
@@ -4964,6 +5104,7 @@ function performDraw(count) {
     picks.forEach((c) => inv.push(c.id));
     saveInventory(inv);
     renderSelectCardArea();
+    try { picks.forEach((c) => { const img = getCardImage(c.id); if (img) unlockIllustration(img); }); } catch {}
     const overlay = document.createElement('div'); overlay.className = 'modal-backdrop draw-overlay';
     const cover = document.createElement('div'); cover.className = 'draw-cover';
     const getTierRank = (r) => r === 'SSR' ? 3 : r === 'SR' ? 2 : r === 'R' ? 1 : 0;
@@ -4977,7 +5118,7 @@ function performDraw(count) {
       for (let i = 0; i < (count === 5 ? 80 : 60); i++) { const p = document.createElement('i'); p.className = 'dust'; p.style.left = (Math.random() * 100) + 'vw'; p.style.setProperty('--dx', (Math.random() * 40 - 20) + 'px'); p.style.setProperty('--t', (2.0 + Math.random() * 1.8) + 's'); dust.appendChild(p); }
       document.body.appendChild(dust); setTimeout(() => { try { document.body.removeChild(dust); } catch {} }, 1800);
     }
-    const suffix = devModeEnabled ? '（開發者模式：免扣費）' : '';
+    const suffix = devModeEnabled ? '（開發者模式：免扣費）' : (isFirstLoginFreeDraw ? '（首次登入：免費抽）' : '');
     setTimeout(() => {
       try { document.body.removeChild(overlay); } catch {}
       if (picks.length === 1) {
@@ -5048,7 +5189,6 @@ function performDraw(count) {
     showBlockModal('提示', [{ text: '發生錯誤，稍後再試' }]);
   }
 }
-if (dailyCheckInBtn) dailyCheckInBtn.addEventListener('click', handleDailyCheckIn);
 if (drawCardBtn) drawCardBtn.addEventListener('click', openDrawPrompt);
 
 btn.addEventListener('click', start);
@@ -5145,6 +5285,7 @@ try { clickFxEnabled = getStoredClickFxEnabled(); } catch {}
 document.addEventListener('pointerdown', () => { ensureAudioCtx(); resumeAudioCtx(); initBgm(); playBgm(); }, { once: true });
 document.documentElement.style.setProperty('--bg-image', "url('home.png')");
 document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
+showCoinsOnHome();
   // 自動從網址參數寫入雲端設定（避免每台裝置手動輸入）。
   try {
     const sp = new URLSearchParams(location.search);
@@ -5400,6 +5541,67 @@ function getAccountEndpoint() {
 function getAccountAuth() {
   try { return localStorage.getItem('hanliu_cloud_account_auth') || getCloudAuth(); } catch { return getCloudAuth(); }
 }
+function getProfileEndpoint() {
+  try {
+    const v = localStorage.getItem('hanliu_cloud_profile_endpoint');
+    if (v && String(v).trim()) return String(v).trim();
+    const base = getCloudEndpoint();
+    if (!base) return '';
+    if (/scores\/?$/.test(base)) return base.replace(/scores\/?$/, 'profile');
+    return base + '/profile';
+  } catch { return ''; }
+}
+function getProfileAuth() {
+  try { return localStorage.getItem('hanliu_cloud_profile_auth') || getCloudAuth(); } catch { return getCloudAuth(); }
+}
+function buildProfileFromLocal() {
+  try {
+    const coins = Number(localStorage.getItem(getCoinsKey()) || 0) || 0;
+    const invRaw = localStorage.getItem(storageKey('inventory'));
+    const inv = invRaw ? JSON.parse(invRaw) : [];
+    const sel = localStorage.getItem(storageKey('selected_card')) || '';
+    const daysRaw = localStorage.getItem(storageKey('login_days')) || '[]';
+    const days = JSON.parse(daysRaw);
+    const last = localStorage.getItem(storageKey('lastCheckInDate')) || '';
+    return { coins, inventory: Array.isArray(inv) ? inv : [], selected_card: sel, login_days: Array.isArray(days) ? days : [], lastCheckInDate: last };
+  } catch { return { coins: 0, inventory: [], selected_card: '', login_days: [], lastCheckInDate: '' }; }
+}
+function applyProfileToLocal(p) {
+  try {
+    if (!p || typeof p !== 'object') return;
+    if (typeof p.coins === 'number') { userCoins = Number(p.coins) || 0; localStorage.setItem(getCoinsKey(), String(userCoins)); updateCoinsDisplay(); }
+    if (Array.isArray(p.inventory)) { localStorage.setItem(storageKey('inventory'), JSON.stringify(p.inventory)); renderSelectCardArea(); }
+    if (typeof p.selected_card === 'string') { selectedCardId = p.selected_card || ''; localStorage.setItem(storageKey('selected_card'), selectedCardId); if (equipExileCard) equipExileCard.checked = (selectedCardId === 'card_exile'); }
+    if (Array.isArray(p.login_days)) { localStorage.setItem(storageKey('login_days'), JSON.stringify(p.login_days)); }
+    if (typeof p.lastCheckInDate === 'string') { localStorage.setItem(storageKey('lastCheckInDate'), p.lastCheckInDate || ''); }
+  } catch {}
+}
+async function loadProfileFromCloud() {
+  if (!isAccountBound()) return;
+  const acc = getStoredAccount();
+  const ep = getProfileEndpoint();
+  const au = getProfileAuth();
+  if (!acc || !acc.id || !ep) return;
+  try {
+    const url = ep + (ep.includes('?') ? '&' : '?') + 'id=' + encodeURIComponent(acc.id);
+    const r = await fetch(url, { headers: { ...(au ? { authorization: au } : {}) } });
+    if (!r.ok) return;
+    const data = await r.json().catch(() => null);
+    if (!data || typeof data !== 'object') return;
+    applyProfileToLocal(data);
+  } catch {}
+}
+async function syncProfileToCloud(obj) {
+  if (!isAccountBound()) return;
+  const acc = getStoredAccount();
+  const ep = getProfileEndpoint();
+  const au = getProfileAuth();
+  if (!acc || !acc.id || !ep) return;
+  try {
+    const body = { accountId: acc.id, kind: 'profile', profile: (obj || buildProfileFromLocal()), ts: Date.now() };
+    await fetch(ep, { method: 'POST', headers: { 'content-type': 'application/json', ...(au ? { authorization: au } : {}) }, body: JSON.stringify(body) }).catch(() => {});
+  } catch {}
+}
 async function syncAccountToCloud(acc) {
   const ep = getAccountEndpoint();
   const au = getAccountAuth();
@@ -5474,6 +5676,9 @@ function dismissAuthGateToHome() {
   const hsv2 = document.getElementById('homeSfxVolume'); if (hsv2) hsv2.hidden = true;
   const inputEl = document.getElementById('playerName');
   try { if (inputEl) inputEl.focus(); } catch {}
+  performAutoDailyCheckIn();
+  reloadCoins();
+  showCoinsOnHome();
 }
 async function syncUnlocksFromCloud() {
   if (!isAccountBound()) return;
@@ -5517,14 +5722,16 @@ function getIllustrationList() {
     'han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png',
     'han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png',
     'han_yu_youth_insomnia.png','han_yu_middle_insomnia.png','han_yu_aged_insomnia.png',
-    'han_yu_aged_dark_cuisine.png','han_yu_immortal.png','luliang.png','mengjiao_moon.png','Mansion.png'
+    'han_yu_aged_dark_cuisine.png','han_yu_immortal.png','luliang.png','mengjiao_moon.png','Mansion.png',
+    'card_exile.png','card_dream.png','card_spring.png','card_memorial.png'
   ];
 }
 function getIllustrationGroups() {
   return [
     { title: '結算', items: ['hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png'] },
-    { title: '場景', items: ['luliang.png','Mansion.png'] },
-    { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_youth_insomnia.png','han_yu_middle_insomnia.png','han_yu_aged_insomnia.png','han_yu_aged_dark_cuisine.png','han_yu_immortal.png','mengjiao_moon.png'] },
+    { title: '場景', items: ['luliang.png','mengjiao_moon.png','Mansion.png'] },
+    { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_youth_insomnia.png','han_yu_middle_insomnia.png','han_yu_aged_insomnia.png','han_yu_aged_dark_cuisine.png','han_yu_immortal.png'] },
+    { title: '卡片', items: ['card_exile.png','card_dream.png','card_spring.png','card_memorial.png'] },
   ];
 }
 function loadAccountUnlocks() {
@@ -5688,7 +5895,11 @@ function getIllustrationDescription(key) {
     'han_yu_immortal.png': '迴光返照，三十秒問答。',
     'luliang.png': '陸贄、梁肅出現，文名遠播，轉機已現',
     'mengjiao_moon.png': '孟郊月下，詩友同心。',
-    'Mansion.png': '宰相公府，門緊閉而志不屈。'
+    'Mansion.png': '宰相公府，門緊閉而志不屈。',
+    'card_exile.png': '夕貶潮州：被貶前不會死亡；依失誤扣分。',
+    'card_dream.png': '莊周夢蝶：夢境稀有事件機率提升。',
+    'card_spring.png': '早春小雨：提示高亮正解；結算依失誤調整分數。',
+    'card_memorial.png': '諫迎佛骨：一血挑戰；每關額外加分。'
   };
   return map[key] || '';
 }
@@ -6005,7 +6216,18 @@ function openAccountDialog() {
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
     const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false;
+    await loadProfileFromCloud().catch(() => {});
     dismissAuthGateToHome();
+    setTimeout(() => {
+      try {
+        const acc2 = getStoredAccount();
+        if (acc2 && acc2.id) {
+          const k = `hanliu_first_draw_awarded_${acc2.id}`;
+          const done = localStorage.getItem(k) === '1';
+          if (!done) { isFirstLoginFreeDraw = true; performDraw(1); isFirstLoginFreeDraw = false; localStorage.setItem(k, '1'); }
+        }
+      } catch {}
+    }, 600);
   });
   loginBtn.addEventListener('click', async () => {
     const nm = String(nameInput.value || '').trim();
@@ -6021,11 +6243,22 @@ function openAccountDialog() {
     if (!h || h !== acc.hash) { status.textContent = '密碼錯誤'; return; }
     try { localStorage.setItem('hanliu_account_name', String(acc.name || '')); } catch {}
     await syncUnlocksFromCloud().catch(() => {});
+    await loadProfileFromCloud().catch(() => {});
     applyPlayerNameInputState();
     blockingModalOpen = false;
     try { document.body.removeChild(overlay); } catch {}
     const sb = document.getElementById('settingsBtn'); if (sb) sb.hidden = false;
     dismissAuthGateToHome();
+    setTimeout(() => {
+      try {
+        const acc2 = getStoredAccount();
+        if (acc2 && acc2.id) {
+          const k = `hanliu_first_draw_awarded_${acc2.id}`;
+          const done = localStorage.getItem(k) === '1';
+          if (!done) { isFirstLoginFreeDraw = true; performDraw(1); isFirstLoginFreeDraw = false; localStorage.setItem(k, '1'); }
+        }
+      } catch {}
+    }, 600);
   });
   deleteBtn.addEventListener('click', async () => {
     const acc = getStoredAccount();
@@ -6105,6 +6338,16 @@ function openCloudConfig() {
   unlockAuthInput.type = 'text';
   unlockAuthInput.placeholder = '圖鑑 Authorization（可空），例如 Bearer xxx';
   unlockAuthInput.value = getUnlockAuth() || '';
+  const profileEpInput = document.createElement('input');
+  profileEpInput.className = 'input';
+  profileEpInput.type = 'text';
+  profileEpInput.placeholder = '玩家資料 Endpoint（可空），例如 https://xxx.workers.dev/profile';
+  profileEpInput.value = getProfileEndpoint() || '';
+  const profileAuthInput = document.createElement('input');
+  profileAuthInput.className = 'input';
+  profileAuthInput.type = 'text';
+  profileAuthInput.placeholder = '玩家資料 Authorization（可空），例如 Bearer xxx';
+  profileAuthInput.value = getProfileAuth() || '';
   const accEpInput = document.createElement('input');
   accEpInput.className = 'input';
   accEpInput.type = 'text';
@@ -6154,6 +6397,15 @@ function openCloudConfig() {
         })
         .catch(() => { status.textContent += '｜帳號失敗'; });
     }
+    const purl = profileEpInput.value.trim();
+    if (purl) {
+      fetch(purl, { headers: { ...(profileAuthInput.value.trim() ? { authorization: profileAuthInput.value.trim() } : {}) } })
+        .then(async (r) => {
+          const ok = r.ok;
+          status.textContent += ok ? '｜資料 OK' : `｜資料失敗 HTTP ${r.status}`;
+        })
+        .catch(() => { status.textContent += '｜資料失敗'; });
+    }
   };
   save.addEventListener('click', () => {
     try { localStorage.setItem('hanliu_cloud_endpoint', epInput.value.trim()); } catch {}
@@ -6162,6 +6414,8 @@ function openCloudConfig() {
     try { if (unlockAuthInput.value.trim()) localStorage.setItem('hanliu_cloud_unlock_auth', unlockAuthInput.value.trim()); else localStorage.removeItem('hanliu_cloud_unlock_auth'); } catch {}
     try { if (accEpInput.value.trim()) localStorage.setItem('hanliu_cloud_account_endpoint', accEpInput.value.trim()); else localStorage.removeItem('hanliu_cloud_account_endpoint'); } catch {}
     try { if (accAuthInput.value.trim()) localStorage.setItem('hanliu_cloud_account_auth', accAuthInput.value.trim()); else localStorage.removeItem('hanliu_cloud_account_auth'); } catch {}
+    try { if (profileEpInput.value.trim()) localStorage.setItem('hanliu_cloud_profile_endpoint', profileEpInput.value.trim()); else localStorage.removeItem('hanliu_cloud_profile_endpoint'); } catch {}
+    try { if (profileAuthInput.value.trim()) localStorage.setItem('hanliu_cloud_profile_auth', profileAuthInput.value.trim()); else localStorage.removeItem('hanliu_cloud_profile_auth'); } catch {}
     status.textContent = '已保存';
   });
   test.addEventListener('click', () => {
@@ -6209,6 +6463,8 @@ function openCloudConfig() {
   sec.appendChild(unlockAuthInput);
   sec.appendChild(accEpInput);
   sec.appendChild(accAuthInput);
+  sec.appendChild(profileEpInput);
+  sec.appendChild(profileAuthInput);
   sec.appendChild(status);
   sec.appendChild(actions);
 }
@@ -6369,6 +6625,7 @@ function openAuthGate() {
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
   const hv = document.getElementById('homeVolume'); if (hv) hv.hidden = true;
   const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
+  hideCoins();
   clearMainContent(true);
   document.documentElement.style.setProperty('--bg-image', 'url("hanliu_auth_bg.png")');
   document.documentElement.style.setProperty('--bg-overlay', 'none');
@@ -6420,6 +6677,9 @@ function openAuthGate() {
     const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = false;
     const hsv2 = document.getElementById('homeSfxVolume'); if (hsv2) hsv2.hidden = false;
     try { input.focus(); } catch {}
+    performAutoDailyCheckIn();
+    reloadCoins();
+    showCoinsOnHome();
   });
   actions.appendChild(accountBtn);
   actions.appendChild(guestBtn);
