@@ -899,10 +899,22 @@ body {
   }
   #feedback-btn { bottom: 10px; left: 10px; font-size: 14px; padding: 8px 12px; }
   .home-volume-toggle { right: 10px; top: 10px; width: 36px; height: 36px; }
-  .home-volume { right: 10px; width: 140px; }
+  .home-volume { right: 140px; }
   #homeVolume { top: 52px; }
   #homeSfxVolume { top: 88px; }
   .home-volume.is-visible { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+}
+@media screen and (max-width: 800px ) {
+  .calendar-toggle {
+    right: 60px;
+    top: 10px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 900;
+  }
 }
 /* 第一關：句讀明義互動版 */
 .seg-box {
@@ -943,6 +955,24 @@ body {
 .settings-toggle {
   position: fixed;
   right: 16px;
+  top: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #2a2a2a;
+  background: linear-gradient(180deg, #1d1f21, #161719);
+  color: var(--fg);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  z-index: 1000;
+}
+.calendar-toggle {
+  position: fixed;
+  right: 64px;
   top: 16px;
   width: 40px;
   height: 40px;

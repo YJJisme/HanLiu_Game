@@ -4848,7 +4848,9 @@ function openSignInModal(message, ym, days) {
   const parts = String(ym).split('-'); const yy = parseInt(parts[0], 10); const mm = parseInt(parts[1], 10) - 1;
   const first = new Date(yy, mm, 1); const startWd = first.getDay(); const last = new Date(yy, mm + 1, 0); const dayCount = last.getDate();
   for (let i = 0; i < startWd; i++) { const s = document.createElement('div'); grid.appendChild(s); }
-  const set = new Set(Array.isArray(days) ? days : []);
+  const storedDays = getLoginDays();
+  const unionDays = Array.from(new Set([...(Array.isArray(days) ? days : []), ...(Array.isArray(storedDays) ? storedDays : [])]));
+  const set = new Set(unionDays);
   const today = todayString();
   for (let d = 1; d <= dayCount; d++) {
     const cell = document.createElement('div');
@@ -4882,6 +4884,74 @@ function openSignInModal(message, ym, days) {
   modal.appendChild(grid);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+}
+function openSignInCalendar() {
+  try {
+    const today = todayString();
+    const ym = today.slice(0, 7);
+    const storedDays = getLoginDays();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-backdrop active-block';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    const close = document.createElement('button');
+    close.className = 'modal-close';
+    close.type = 'button';
+    close.textContent = '×';
+    close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+    const title = document.createElement('h2');
+    title.className = 'modal-title';
+    title.textContent = '簽到月曆';
+    const info = document.createElement('p');
+    info.className = 'dialog-text';
+    const streak = computeConsecutiveStreak(storedDays);
+    const mcount = countMonthlyLogins(storedDays, ym);
+    const total = (Array.isArray(storedDays) ? storedDays.length : 0);
+    info.textContent = `連續 ${streak} 天｜本月 ${mcount} 天｜累計 ${total} 天`;
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+    grid.style.gap = '6px';
+    grid.style.marginTop = '0.5rem';
+    const week = ['日','一','二','三','四','五','六'];
+    week.forEach((w) => { const h = document.createElement('div'); h.className = 'dialog-text'; h.style.textAlign = 'center'; h.style.fontWeight = '900'; h.textContent = w; grid.appendChild(h); });
+    const parts = ym.split('-'); const yy = parseInt(parts[0], 10); const mm = parseInt(parts[1], 10) - 1;
+    const first = new Date(yy, mm, 1); const startWd = first.getDay(); const last = new Date(yy, mm + 1, 0); const dayCount = last.getDate();
+    for (let i = 0; i < startWd; i++) { const s = document.createElement('div'); grid.appendChild(s); }
+    const set = new Set(Array.isArray(storedDays) ? storedDays : []);
+    for (let d = 1; d <= dayCount; d++) {
+      const cell = document.createElement('div');
+      cell.style.border = '1px solid #2a2a2a';
+      cell.style.borderRadius = '8px';
+      cell.style.padding = '6px';
+      cell.style.display = 'flex';
+      cell.style.alignItems = 'center';
+      cell.style.justifyContent = 'center';
+      cell.style.position = 'relative';
+      const label = document.createElement('span'); label.className = 'dialog-text'; label.textContent = String(d);
+      const key = `${ym}-${String(d).padStart(2, '0')}`;
+      if (set.has(key)) { cell.style.background = 'linear-gradient(180deg, #263238, #0f1a24)'; label.style.color = '#cfe9f3'; }
+      if (set.has(key)) {
+        const mark = document.createElement('span');
+        mark.className = 'dialog-text';
+        mark.textContent = '✓';
+        mark.style.position = 'absolute';
+        mark.style.top = '4px';
+        mark.style.right = '6px';
+        mark.style.color = key === today ? '#9be7ff' : '#6ea3b5';
+        mark.style.fontWeight = '900';
+        cell.appendChild(mark);
+      }
+      cell.appendChild(label);
+      grid.appendChild(cell);
+    }
+    modal.appendChild(close);
+    modal.appendChild(title);
+    modal.appendChild(info);
+    modal.appendChild(grid);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  } catch {}
 }
 function performAutoDailyCheckIn() {
   try {
@@ -5277,6 +5347,8 @@ document.addEventListener('pointerdown', (e) => {
 });
 const settingsBtn = document.getElementById('settingsBtn');
 if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+const calendarBtn = document.getElementById('calendarBtn');
+if (calendarBtn) calendarBtn.addEventListener('click', openSignInCalendar);
 setupBgmAutoplay();
 initBgm();
 playBgm();
@@ -5669,6 +5741,7 @@ function dismissAuthGateToHome() {
   if (gateActions && main) { try { main.removeChild(gateActions); } catch {} }
   if (startScreen) startScreen.style.display = '';
   const sbtn = document.getElementById('settingsBtn'); if (sbtn) sbtn.hidden = false;
+  const cal = document.getElementById('calendarBtn'); if (cal) cal.hidden = false;
   try { if (window.__authGateResizeHandler) { window.removeEventListener('resize', window.__authGateResizeHandler); window.__authGateResizeHandler = null; } } catch {}
   applyPlayerNameInputState();
   const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = true;
@@ -6625,6 +6698,7 @@ function openAuthGate() {
   const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
   const hv = document.getElementById('homeVolume'); if (hv) hv.hidden = true;
   const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
+  const calHide = document.getElementById('calendarBtn'); if (calHide) calHide.hidden = true;
   hideCoins();
   clearMainContent(true);
   document.documentElement.style.setProperty('--bg-image', 'url("hanliu_auth_bg.png")');
@@ -6676,6 +6750,7 @@ function openAuthGate() {
     const hvb2 = document.getElementById('homeVolumeToggle'); if (hvb2) hvb2.hidden = false;
     const hv2 = document.getElementById('homeVolume'); if (hv2) hv2.hidden = false;
     const hsv2 = document.getElementById('homeSfxVolume'); if (hsv2) hsv2.hidden = false;
+    const cal = document.getElementById('calendarBtn'); if (cal) cal.hidden = false;
     try { input.focus(); } catch {}
     performAutoDailyCheckIn();
     reloadCoins();
