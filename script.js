@@ -84,6 +84,7 @@ let blockingModalOpen = false;
 let levelTransitioning = false;
 let customNumberFailText = null;
 let isHintUsedInLevel = false;
+let springHintUsedInRun = false;
 let mismatchCounter = 0;
 let bgmAudio = null;
 let bgmEnabled = true;
@@ -162,6 +163,8 @@ function openCoinsHelp() {
 
 let currentLevelMistakes = 0;
 let dreamGambleActive = false;
+let surviveNegationUsed = false;
+let levelScoreSuppressed = false;
 function storageKey(base) {
   if (devModeEnabled) return `hanliu_dev_${base}`;
   if (isAccountBound()) {
@@ -176,7 +179,10 @@ const CARD_DATA = [
   { id: 'card_dream', name: '莊周夢蝶', rarity: 'N', desc: '莫憂世事兼身事，須著人間比夢間。作夢關卡可選擇觸發，使稀有事件發生機率提高 10%；攜帶出征即視同使用，該局結算扣除。' },
   { id: 'card_spring', name: '早春小雨', rarity: 'R', desc: '天街小雨潤如酥，草色遙看近卻無。適用關卡顯示「小雨提示」高亮正解；通關後依失誤：完美 +5，失誤 -5。' },
   { id: 'card_memorial', name: '諫迎佛骨', rarity: 'SSR', desc: '欲為聖明除弊事，肯將衰朽惜殘年！一血挑戰：生命上限 1；每關通關後額外 +10 分。', effectType: 'HARDCORE_SCORE', hpLimit: 1, bonusPerLevel: 10 },
+  { id: 'card_dragon', name: '寒泉化龍', rarity: 'N', desc: '聞說旱時求得雨，只疑科斗是蛟龍。完成最後一關後結算時間偏移 -5 秒，用於排行榜與迴光返照判定。', effectType: 'TIME_BUFF' },
+  { id: 'card_survive', name: '蠻荒餘生', rarity: 'N', desc: '竄逐蠻荒幸不死，衣食才足甘長終。裝備此卡可在一血扣血時抵銷一次傷害，但該關卡通關不會獲得分數。', effectType: 'SURVIVE_ONE' },
 ];
+const TIME_BUFF = -5000;
 function getCardName(id) { const f = CARD_DATA.find(x => x.id === id); return f ? f.name : id; }
 function getCardRarity(id) { const f = CARD_DATA.find(x => x.id === id); return f ? f.rarity : ''; }
 function getCardImage(id) {
@@ -185,6 +191,8 @@ function getCardImage(id) {
     card_dream: 'card_dream.png',
     card_spring: 'card_spring.png',
     card_memorial: 'card_memorial.png',
+    card_dragon: 'card_dragon.png',
+    card_survive: 'card_survive.png',
   };
   return map[id] || '';
 }
@@ -593,10 +601,11 @@ function getCharacterVersion() {
 
 function applyLevelStyle(levelType) {
   const root = document.documentElement;
+  if (levelType === 'Number') { levelScoreSuppressed = false; }
   if (levelType === 'Number') {
-    root.style.setProperty('--bg', '#f0f8ff');
-    root.style.setProperty('--fg', '#333333');
-    root.style.setProperty('--muted', '#555555');
+    root.style.setProperty('--bg', '#fff');
+    root.style.setProperty('--fg', '#000000');
+    root.style.setProperty('--muted', '#4a5b6b');
     root.style.setProperty('--title', '#000000');
   } else if (levelType === 'Dream') {
     root.style.setProperty('--bg', '#000000');
@@ -729,6 +738,21 @@ function handleError(levelType) {
       const penalty = (10 + Math.max(0, currentLevelMistakes - 2));
       showPunishOverlay();
       showBlockModal('提示', [{ text: `夕貶潮州：命運庇護中。目前該關扣分：${penalty}` }]);
+      setTimeout(() => {
+        errorLock = false;
+        if (currentLevel === 8 && typeof window.level8Reset === 'function') { window.level8Reset(); }
+        if (currentLevel === 9 && typeof window.level9Reset === 'function') { window.level9Reset(); }
+        if (currentLevel === 10 && typeof window.level10Reset === 'function') { window.level10Reset(); }
+      }, 2000);
+      return;
+    }
+    if (hpMax === 1 && selectedCardId === 'card_survive' && !surviveNegationUsed) {
+      surviveNegationUsed = true;
+      levelScoreSuppressed = true;
+      updateHpBar();
+      try { sfxError(); } catch {}
+      showPunishOverlay();
+      showBlockModal('提示', [{ text: '蠻荒餘生：抵銷一次一血傷害。本關結算分數為 0。' }]);
       setTimeout(() => {
         errorLock = false;
         if (currentLevel === 8 && typeof window.level8Reset === 'function') { window.level8Reset(); }
@@ -1804,7 +1828,7 @@ function startPoetryLevel() {
     hintBtn.className = 'button';
     hintBtn.type = 'button';
     hintBtn.textContent = '小雨提示';
-    if (selectedCardId !== 'card_spring') hintBtn.style.display = 'none';
+    if (selectedCardId !== 'card_spring' || springHintUsedInRun) hintBtn.style.display = 'none';
     const options = document.createElement('div');
     options.className = 'options';
     const distractorTitles = shuffleArray(idxs.filter(i => i !== pick[0])).slice(0, 3).map(i => poetryLevelQuestions[i].title);
@@ -1829,11 +1853,12 @@ function startPoetryLevel() {
     });
     level.appendChild(options);
     hintBtn.addEventListener('click', () => {
-      isHintUsedInLevel = true;
-      hintBtn.style.display = 'none';
-      playSpringHintEffect();
-      const btns = options.querySelectorAll('button.option');
-      btns.forEach(b => { if (b.textContent === q1Poem.title) b.classList.add('hint-green'); });
+    isHintUsedInLevel = true;
+    springHintUsedInRun = true;
+    hintBtn.style.display = 'none';
+    playSpringHintEffect();
+    const btns = options.querySelectorAll('button.option');
+    btns.forEach(b => { if (b.textContent === q1Poem.title) b.classList.add('hint-green'); });
     });
     level.appendChild(hintBtn);
   }
@@ -1855,7 +1880,7 @@ function startPoetryLevel() {
     hintBtn.className = 'button';
     hintBtn.type = 'button';
     hintBtn.textContent = '小雨提示';
-    if (selectedCardId !== 'card_spring') hintBtn.style.display = 'none';
+    if (selectedCardId !== 'card_spring' || springHintUsedInRun) hintBtn.style.display = 'none';
     const options = document.createElement('div');
     options.className = 'options';
     const otherClauses = poetryLevelQuestions.filter(p => p !== q2Poem).flatMap(p => extractClauses(p.full_text).map(x => x.text));
@@ -1883,11 +1908,12 @@ function startPoetryLevel() {
     });
     level.appendChild(options);
     hintBtn.addEventListener('click', () => {
-      isHintUsedInLevel = true;
-      hintBtn.style.display = 'none';
-      playSpringHintEffect();
-      const btns = options.querySelectorAll('button.option');
-      btns.forEach(b => { if (b.textContent === clauses[picked].text) b.classList.add('hint-green'); });
+    isHintUsedInLevel = true;
+    springHintUsedInRun = true;
+    hintBtn.style.display = 'none';
+    playSpringHintEffect();
+    const btns = options.querySelectorAll('button.option');
+    btns.forEach(b => { if (b.textContent === clauses[picked].text) b.classList.add('hint-green'); });
     });
     level.appendChild(hintBtn);
   }
@@ -2363,7 +2389,8 @@ function startReviewLevel() {
     const ok = actual.length === expected.length && actual.every((x, i) => x === expected[i]);
     if (ok) {
       bumpScore(30);
-      const elapsedSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : Number.MAX_SAFE_INTEGER;
+      const ms = startTime ? Math.max(0, (Date.now() - startTime) + (selectedCardId === 'card_dragon' ? TIME_BUFF : 0)) : Number.MAX_SAFE_INTEGER * 1000;
+      const elapsedSec = Math.floor(ms / 1000);
       const fastRoute = elapsedSec <= 600;
       if (fastRoute) {
         showBlockModal('通關', [{ text: '你在十分鐘內完成排序，開啟迴光返照福利。' }], () => { sec.style.display = 'none'; startRevivalLevel(); });
@@ -2373,7 +2400,8 @@ function startReviewLevel() {
     } else {
       const prev = matchScore;
       if (prev > 0) bumpScore(-prev);
-      const elapsedSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : Number.MAX_SAFE_INTEGER;
+      const ms = startTime ? Math.max(0, (Date.now() - startTime) + (selectedCardId === 'card_dragon' ? TIME_BUFF : 0)) : Number.MAX_SAFE_INTEGER * 1000;
+      const elapsedSec = Math.floor(ms / 1000);
       const fastRoute = elapsedSec <= 600;
       orderFailed = true;
       if (fastRoute) {
@@ -3406,7 +3434,8 @@ function saveScore(name, score, route) {
   let arr = [];
   try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
   const now = Date.now();
-  const totalSeconds = startTime ? Math.max(0, Math.floor((now - startTime) / 1000)) : 0;
+  const msElapsed = startTime ? Math.max(0, (now - startTime) + (selectedCardId === 'card_dragon' ? TIME_BUFF : 0)) : 0;
+  const totalSeconds = Math.floor(msElapsed / 1000);
   const acc = isAccountBound() ? getStoredAccount() : null;
   const rec = { id: genRecordId(), name: acc && acc.name ? acc.name : name, score, route, time: totalSeconds, progress: currentProgress, ts: now, ...(acc && acc.id ? { accountId: acc.id } : {}) };
   lastRunId = rec.id;
@@ -3863,7 +3892,7 @@ function renderSentenceQuestion() {
   hintBtn.className = 'button';
   hintBtn.type = 'button';
   hintBtn.textContent = '小雨提示';
-  if (selectedCardId !== 'card_spring') hintBtn.style.display = 'none';
+  if (selectedCardId !== 'card_spring' || springHintUsedInRun) hintBtn.style.display = 'none';
   const submitBtn = document.createElement('button');
   submitBtn.className = 'button';
   submitBtn.type = 'button';
@@ -3873,6 +3902,7 @@ function renderSentenceQuestion() {
   let submitting = false;
   hintBtn.addEventListener('click', () => {
     isHintUsedInLevel = true;
+    springHintUsedInRun = true;
     hintBtn.style.display = 'none';
     playSpringHintEffect();
     const correct = normalizeSegmentation(q.correctSegmentation);
@@ -4805,6 +4835,7 @@ function start() {
     const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
     const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
     hpMax = (selectedCardId === 'card_memorial' ? 1 : 2);
+    springHintUsedInRun = false;
     resetHpBar();
     createDialogContainer(playerName);
   });
@@ -5043,7 +5074,7 @@ function handleDrawCard() {
         faceFront.className = `face front rar-${rare}`;
         const tip = document.createElement('p');
         tip.className = 'dialog-text';
-        tip.textContent = '點擊翻卡';
+        tip.textContent = '長按看詳情';
         faceFront.appendChild(tip);
         const faceBack = document.createElement('div');
         faceBack.className = `face back rar-${rare}`;
@@ -5056,14 +5087,7 @@ function handleDrawCard() {
           img.onerror = () => { try { faceBack.removeChild(img); } catch {} };
           faceBack.appendChild(img);
         }
-        const info = document.createElement('p');
-        info.className = 'dialog-text';
-        info.textContent = `「${getCardName(id)}」｜${rare}${suffix}`;
-        faceBack.appendChild(info);
-        const poem = document.createElement('p');
-        poem.className = 'dialog-text';
-        poem.textContent = desc;
-        faceBack.appendChild(poem);
+        /* show only image on back; details via long press */
         card.appendChild(faceFront);
         card.appendChild(faceBack);
         card.addEventListener('click', () => { card.classList.toggle('flip'); });
@@ -5186,7 +5210,17 @@ function performDraw(count) {
     if (top.rarity === 'SSR') {
       const dust = document.createElement('div'); dust.className = 'gold-dust';
       for (let i = 0; i < (count === 5 ? 80 : 60); i++) { const p = document.createElement('i'); p.className = 'dust'; p.style.left = (Math.random() * 100) + 'vw'; p.style.setProperty('--dx', (Math.random() * 40 - 20) + 'px'); p.style.setProperty('--t', (2.0 + Math.random() * 1.8) + 's'); dust.appendChild(p); }
-      document.body.appendChild(dust); setTimeout(() => { try { document.body.removeChild(dust); } catch {} }, 1800);
+      document.body.appendChild(dust);
+      const snow = document.createElement('div'); snow.className = 'snowflakes';
+      for (let i = 0; i < (count === 5 ? 60 : 40); i++) { const p = document.createElement('i'); p.className = 'flake'; p.style.left = (Math.random() * 100) + 'vw'; p.style.setProperty('--dx', (Math.random() * 30 - 15) + 'px'); p.style.setProperty('--t', (2.0 + Math.random() * 1.8) + 's'); snow.appendChild(p); }
+      document.body.appendChild(snow);
+      setTimeout(() => { try { document.body.removeChild(dust); } catch {} try { document.body.removeChild(snow); } catch {} }, 1800);
+    }
+    if (top.rarity === 'R') {
+      const rain = document.createElement('div'); rain.className = 'drizzle';
+      for (let i = 0; i < (count === 5 ? 60 : 40); i++) { const d = document.createElement('i'); d.className = 'drop'; d.style.left = (Math.random() * 100) + 'vw'; d.style.setProperty('--dx', (Math.random() * 20 - 10) + 'px'); d.style.setProperty('--t', (1.2 + Math.random() * 1.0) + 's'); rain.appendChild(d); }
+      document.body.appendChild(rain);
+      setTimeout(() => { try { document.body.removeChild(rain); } catch {} }, 1800);
     }
     const suffix = devModeEnabled ? '（開發者模式：免扣費）' : (isFirstLoginFreeDraw ? '（首次登入：免費抽）' : '');
     setTimeout(() => {
@@ -5201,11 +5235,10 @@ function performDraw(count) {
           const close = document.createElement('button'); close.className = 'modal-close'; close.type = 'button'; close.textContent = '×'; close.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
           const title = document.createElement('h2'); title.className = 'modal-title'; title.textContent = '獲得卡片';
           const card = document.createElement('div'); card.className = 'card3d';
-          const faceFront = document.createElement('div'); faceFront.className = `face front rar-${rare}`; const tip = document.createElement('p'); tip.className = 'dialog-text'; tip.textContent = '點擊翻卡'; faceFront.appendChild(tip);
+          const faceFront = document.createElement('div'); faceFront.className = `face front rar-${rare}`; const tip = document.createElement('p'); tip.className = 'dialog-text'; tip.textContent = '長按看詳情'; faceFront.appendChild(tip);
           const faceBack = document.createElement('div'); faceBack.className = `face back rar-${rare}`;
           const imgSrc = getCardImage(id); if (imgSrc) { const img = document.createElement('img'); img.src = imgSrc; img.alt = getCardName(id); img.className = 'card-img'; img.onerror = () => { try { faceBack.removeChild(img); } catch {} }; faceBack.appendChild(img); }
-          const info = document.createElement('p'); info.className = 'dialog-text'; info.textContent = `「${getCardName(id)}」｜${rare}${suffix}`; faceBack.appendChild(info);
-          const poem = document.createElement('p'); poem.className = 'dialog-text'; poem.textContent = desc; faceBack.appendChild(poem);
+          /* only image on back; details via long press */
           card.appendChild(faceFront); card.appendChild(faceBack);
           attachDrawCardInteractions(card, rare, id, null, true);
           modal.appendChild(close); modal.appendChild(title); modal.appendChild(card);
@@ -5218,14 +5251,12 @@ function performDraw(count) {
         const modal = document.createElement('div'); modal.className = 'modal';
         const close = document.createElement('button'); close.className = 'modal-close'; close.type = 'button'; close.textContent = '×'; close.addEventListener('click', () => { try { document.body.removeChild(reveal); } catch {} });
         const title = document.createElement('h2'); title.className = 'modal-title'; title.textContent = '五連抽結果';
-        const wrap = document.createElement('div'); wrap.className = 'carousel';
-        const indexText = document.createElement('p'); indexText.className = 'carousel-index';
-        let cur = 0;
-        const buildCard = (c) => {
+        const grid = document.createElement('div'); grid.className = 'draw-grid';
+        picks.forEach((c) => {
           const container = document.createElement('div');
           container.className = 'card3d';
           const faceFront = document.createElement('div'); faceFront.className = `face front rar-${c.rarity}`;
-          const tip = document.createElement('p'); tip.className = 'dialog-text'; tip.textContent = '點擊翻卡'; faceFront.appendChild(tip);
+          const tip = document.createElement('p'); tip.className = 'dialog-text'; tip.textContent = '長按看詳情'; faceFront.appendChild(tip);
           const faceBack = document.createElement('div'); faceBack.className = `face back rar-${c.rarity}`;
           const imgSrc = getCardImage(c.id);
           if (imgSrc) {
@@ -5233,25 +5264,12 @@ function performDraw(count) {
             img.onerror = () => { try { faceBack.removeChild(img); } catch {} };
             faceBack.appendChild(img);
           }
-          const info = document.createElement('p'); info.className = 'dialog-text'; info.textContent = `「${getCardName(c.id)}」｜${c.rarity}${suffix}`;
-          const desc = document.createElement('p'); desc.className = 'dialog-text'; desc.textContent = (CARD_DATA.find(x => x.id === c.id)?.desc) || '';
-          faceBack.appendChild(info); faceBack.appendChild(desc);
+          /* only image in grid; details via long press */
           container.appendChild(faceFront); container.appendChild(faceBack);
-          attachDrawCardInteractions(container, c.rarity, c.id, () => { nextCard(); }, true);
-          return container;
-        };
-        function nextCard() {
-          try { wrap.querySelector('.card3d') && wrap.removeChild(wrap.querySelector('.card3d')); } catch {}
-          cur += 1;
-          if (cur >= picks.length) { try { document.body.removeChild(reveal); } catch {} return; }
-          indexText.textContent = `${cur + 1} / ${picks.length}`;
-          wrap.appendChild(buildCard(picks[cur]));
-        }
-        let cardEl = buildCard(picks[cur]);
-        indexText.textContent = `${cur + 1} / ${picks.length}`;
-        wrap.appendChild(indexText);
-        wrap.appendChild(cardEl);
-        modal.appendChild(close); modal.appendChild(title); modal.appendChild(wrap);
+          attachDrawCardInteractions(container, c.rarity, c.id, null, true);
+          grid.appendChild(container);
+        });
+        modal.appendChild(close); modal.appendChild(title); modal.appendChild(grid);
         reveal.appendChild(modal); document.body.appendChild(reveal);
       }
     }, 1500);
@@ -5410,6 +5428,8 @@ function showHpBar() {
     let scoreLabel = bar.querySelector('#scoreLabel');
     let scoreText = bar.querySelector('#scoreText');
     let hardcoreBadge = bar.querySelector('#hardcoreBadge');
+    let timeLabel = bar.querySelector('#timeLabel');
+    let timeText = bar.querySelector('#currentTimeText');
     if (!scoreLabel) {
       scoreLabel = document.createElement('span');
       scoreLabel.id = 'scoreLabel';
@@ -5437,6 +5457,23 @@ function showHpBar() {
       scoreText.className = 'hp-text';
       scoreText.textContent = String(matchScore || 0);
       bar.appendChild(scoreText);
+    }
+    if (!timeLabel) {
+      timeLabel = document.createElement('span');
+      timeLabel.id = 'timeLabel';
+      timeLabel.className = 'hp-label';
+      timeLabel.textContent = '時間';
+      bar.appendChild(timeLabel);
+    }
+    if (!timeText) {
+      timeText = document.createElement('span');
+      timeText.id = 'currentTimeText';
+      timeText.className = 'hp-text';
+      const sec = startTime ? Math.floor(Math.max(0, Date.now() - startTime) / 1000) : 0;
+      const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      timeText.textContent = `${mm}:${ss}`;
+      bar.appendChild(timeText);
     }
     if (selectedCardId === 'card_memorial') {
       if (!hardcoreBadge) {
@@ -5487,6 +5524,13 @@ function showHpBar() {
         if (st) st.textContent = String(matchScore || 0);
         const pn = document.getElementById('playerNameText');
         if (pn) pn.textContent = localStorage.getItem('hanliu_player_name') || '無名';
+        const tt = document.getElementById('currentTimeText');
+        if (tt) {
+          const sec = startTime ? Math.floor(Math.max(0, Date.now() - startTime) / 1000) : 0;
+          const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+          const ss = String(sec % 60).padStart(2, '0');
+          tt.textContent = `${mm}:${ss}`;
+        }
       }, 300);
     }
   }
@@ -5523,6 +5567,7 @@ function applyLevelClear(levelEl, baseScore) {
   let gain = Math.max(0, Number(baseScore || 0) + bonus - penalty);
   let hintMsg = '';
   let hintPositive = false;
+  if (levelScoreSuppressed) { gain = 0; hintMsg = hintMsg ? (hintMsg + '｜蠻荒餘生：本關結算 0 分') : '蠻荒餘生：本關結算 0 分'; }
   if (selectedCardId === 'card_spring' && isHintUsedInLevel) {
     if (currentLevelMistakes === 0) { gain += 5; hintMsg = '雨潤如酥：完美答對，分數+5'; hintPositive = true; }
     else { gain = Math.max(0, gain - 5); hintMsg = '草色卻無：使用提示後失誤，分數-5'; hintPositive = false; }
@@ -5578,6 +5623,7 @@ function startDebugLevel() {
   currentProgress = `Level ${n}`;
   currentLevelIndex = Array.isArray(gameFlow) ? gameFlow.indexOf(n) : -1;
   matchScore = (n - 1) * 10;
+  springHintUsedInRun = false;
   resetHpBar();
   startNumberLevel(n);
 }
@@ -5804,7 +5850,7 @@ function getIllustrationGroups() {
     { title: '結算', items: ['hanyu_ss.png','hanyu_s.png','hanyu_a.png','hanyu_b.png','hanyu_c.png','hanyu_d.png'] },
     { title: '場景', items: ['luliang.png','mengjiao_moon.png','Mansion.png'] },
     { title: '事件', items: ['han_yu_youth_dead.png','han_yu_middle_dead.png','han_yu_aged_dead.png','han_yu_youth_sleep.png','han_yu_middle_sleep.png','han_yu_aged_sleep.png','han_yu_youth_insomnia.png','han_yu_middle_insomnia.png','han_yu_aged_insomnia.png','han_yu_aged_dark_cuisine.png','han_yu_immortal.png'] },
-    { title: '卡片', items: ['card_exile.png','card_dream.png','card_spring.png','card_memorial.png'] },
+    { title: '卡片', items: ['card_exile.png','card_dream.png','card_spring.png','card_memorial.png','card_dragon.png','card_survive.png'] },
   ];
 }
 function loadAccountUnlocks() {
