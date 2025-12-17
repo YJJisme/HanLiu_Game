@@ -70,6 +70,13 @@ let releaseHistory = {
   '1.1.1': ['加入結算插圖（SS/S/A/B/C/D 等級對應）','SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景']
 };
 let noticeShownOnAuthGate = false;
+const NOTICE_TEXT = {
+  game: [
+    '歡迎來到寒流世界！註冊帳號首次登入送免費一抽！',
+    '警告！遊戲內容雖有設後台儲存資料，但仍可能無法完全跨裝置保存，敬請見諒。'
+  ]
+};
+const DRAW_RATE = { SSR: 5, SR: 20, R: 40, N: 35 };
 
 let matchScore = 0;
 let errorCount = 0;
@@ -103,6 +110,15 @@ let orderFailed = false;
 let cloudSyncDisabled = false;
 let lastRunId = null;
 let clickFxEnabled = true;
+function debounce(fn, wait) {
+  let t = null;
+  return function() {
+    const ctx = this;
+    const args = arguments;
+    if (t) clearTimeout(t);
+    t = setTimeout(function() { fn.apply(ctx, args); }, wait);
+  };
+}
 
 function getCoinsKey() {
   try {
@@ -206,9 +222,9 @@ function getCardImage(id) {
 function drawCard() {
   const r = Math.random() * 100;
   let tier = 'N';
-  if (r < 5) tier = 'SSR';
-  else if (r < 25) tier = 'SR';
-  else if (r < 65) tier = 'R';
+  if (r < DRAW_RATE.SSR) tier = 'SSR';
+  else if (r < (DRAW_RATE.SSR + DRAW_RATE.SR)) tier = 'SR';
+  else if (r < (DRAW_RATE.SSR + DRAW_RATE.SR + DRAW_RATE.R)) tier = 'R';
   else tier = 'N';
   const pool = CARD_DATA.filter(c => c.rarity === tier);
   const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : (CARD_DATA[Math.floor(Math.random() * CARD_DATA.length)]);
@@ -3198,6 +3214,7 @@ function navigateHome() {
   document.documentElement.style.setProperty('--bg-image', "url('home.png')");
   document.documentElement.style.setProperty('--bg-overlay', 'linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38))');
   if (main) { main.style.alignItems = ''; main.style.justifyItems = ''; }
+  hideCharacterDisplay();
   hideHpBar();
   resetGlobalState();
   systemCleanup(false);
@@ -3214,8 +3231,9 @@ function navigateHome() {
 }
 
 function openNotice() {
+  if (document.querySelector('.modal-backdrop.notice')) return;
   const overlay = document.createElement('div');
-  overlay.className = 'modal-backdrop';
+  overlay.className = 'modal-backdrop notice';
   const modal = document.createElement('div');
   modal.className = 'modal hc3';
   const close = document.createElement('button');
@@ -3246,19 +3264,21 @@ function openNotice() {
   modal.appendChild(content);
   const renderGame = () => {
     content.innerHTML = '';
+    const frag = document.createDocumentFragment();
     const basicTitle = document.createElement('h3'); basicTitle.className = 'modal-title'; basicTitle.textContent = '遊戲公告';
-    const basic1 = document.createElement('p'); basic1.className = 'dialog-text'; basic1.textContent = '歡迎來到寒流世界！註冊帳號首次登入送免費一抽！';
-    const basic2 = document.createElement('p'); basic2.className = 'dialog-text'; basic2.textContent = '警告！遊戲內容雖有設後台儲存資料，但仍可能無法完全跨裝置保存，敬請見諒。';
-    content.appendChild(basicTitle);
-    content.appendChild(basic1);
-    content.appendChild(basic2);
+    frag.appendChild(basicTitle);
+    (NOTICE_TEXT.game || []).forEach(function(txt){
+      const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = txt; frag.appendChild(p);
+    });
+    content.appendChild(frag);
   };
   const renderUpdate = () => {
     content.innerHTML = '';
+    const frag = document.createDocumentFragment();
     const updateTitle = document.createElement('h3'); updateTitle.className = 'modal-title'; updateTitle.textContent = '更新公告';
     const ver = document.createElement('p'); ver.className = 'dialog-text'; ver.textContent = `版本：${appVersion}`;
-    content.appendChild(updateTitle);
-    content.appendChild(ver);
+    frag.appendChild(updateTitle);
+    frag.appendChild(ver);
     try {
       const versions = Object.keys(releaseHistory).sort((a, b) => {
         const pa = a.split('.').map(Number); const pb = b.split('.').map(Number);
@@ -3267,17 +3287,15 @@ function openNotice() {
         }
         return 0;
       });
-      versions.forEach(v => {
-        const vh = document.createElement('p');
-        vh.className = 'dialog-text';
-        vh.textContent = `版本 ${v}`;
-        content.appendChild(vh);
+      versions.forEach(function(v){
+        const vh = document.createElement('p'); vh.className = 'dialog-text'; vh.textContent = `版本 ${v}`; frag.appendChild(vh);
         const items = Array.isArray(releaseHistory[v]) ? releaseHistory[v] : [];
-        items.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; content.appendChild(p); });
+        items.forEach(function(n){ const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; frag.appendChild(p); });
       });
     } catch {
-      releaseNotes.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; content.appendChild(p); });
+      releaseNotes.forEach(function(n){ const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; frag.appendChild(p); });
     }
+    content.appendChild(frag);
   };
   let activeTab = 'game';
   const syncButtons = () => {
@@ -3331,10 +3349,6 @@ function openSettings() {
   report.textContent = '回報錯誤/建議';
   const volWrap = document.createElement('div');
   volWrap.className = 'actions';
-  volWrap.style.display = 'flex';
-  volWrap.style.flexDirection = 'column';
-  volWrap.style.alignItems = 'stretch';
-  volWrap.style.gap = '0.5rem';
   volWrap.style.display = 'flex';
   volWrap.style.flexDirection = 'column';
   volWrap.style.alignItems = 'stretch';
@@ -5347,12 +5361,13 @@ function openDrawPrompt() {
   const close = document.createElement('button'); close.className = 'modal-close'; close.type = 'button'; close.textContent = '×'; close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
   const title = document.createElement('h2'); title.className = 'modal-title'; title.textContent = '抽卡';
   const info = document.createElement('p'); info.className = 'dialog-text'; info.textContent = devModeEnabled ? '開發者模式：抽卡免扣費' : '單抽 10｜五連抽 50';
+  const rate = document.createElement('p'); rate.className = 'dialog-text'; rate.textContent = `機率：SSR ${DRAW_RATE.SSR}%｜SR ${DRAW_RATE.SR}%｜R ${DRAW_RATE.R}%｜N ${DRAW_RATE.N}%`;
   const actions = document.createElement('div'); actions.className = 'actions';
   const singleBtn = document.createElement('button'); singleBtn.className = 'button'; singleBtn.type = 'button'; singleBtn.textContent = '單抽'; singleBtn.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} performDraw(1); });
   const fiveBtn = document.createElement('button'); fiveBtn.className = 'button'; fiveBtn.type = 'button'; fiveBtn.textContent = '五連抽'; fiveBtn.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} performDraw(5); });
   const cancelBtn = document.createElement('button'); cancelBtn.className = 'button'; cancelBtn.type = 'button'; cancelBtn.textContent = '取消'; cancelBtn.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
   actions.appendChild(singleBtn); actions.appendChild(fiveBtn); actions.appendChild(cancelBtn);
-  modal.appendChild(close); modal.appendChild(title); modal.appendChild(info); modal.appendChild(actions);
+  modal.appendChild(close); modal.appendChild(title); modal.appendChild(info); modal.appendChild(rate); modal.appendChild(actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 }
@@ -6094,16 +6109,31 @@ async function openGallery() {
   const groups = getIllustrationGroups();
   modal.appendChild(close);
   modal.appendChild(title);
-  groups.forEach((group) => {
+  const tabs = document.createElement('div');
+  tabs.className = 'modal-actions';
+  const content = document.createElement('div');
+  const btns = [];
+  groups.forEach((g, i) => {
+    const b = document.createElement('button');
+    b.className = 'button';
+    b.type = 'button';
+    b.textContent = g.title;
+    btns.push(b);
+    tabs.appendChild(b);
+  });
+  const renderGroup = (idx) => {
+    content.innerHTML = '';
     const gh = document.createElement('p');
     gh.className = 'dialog-text';
-    gh.textContent = group.title;
-    modal.appendChild(gh);
+    gh.textContent = groups[idx].title;
     const grid = document.createElement('div');
     grid.style.display = 'grid';
     grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(160px, 1fr))';
     grid.style.gap = '0.75rem';
-    (group.items || []).forEach((key) => {
+    content.appendChild(gh);
+    content.appendChild(grid);
+    const fragCells = document.createDocumentFragment();
+    (groups[idx].items || []).forEach((key) => {
       const cell = document.createElement('div');
       cell.style.display = 'flex';
       cell.style.flexDirection = 'column';
@@ -6123,6 +6153,8 @@ async function openGallery() {
         img.className = 'illustration';
         img.src = key;
         img.alt = key;
+        img.loading = 'lazy';
+        img.decoding = 'async';
         img.style.width = 'min(140px, 38vw)';
         img.style.maxHeight = '120px';
         img.style.objectFit = 'contain';
@@ -6167,9 +6199,22 @@ async function openGallery() {
           cell.appendChild(toggleBtn);
         }
       }
-      grid.appendChild(cell);
+      fragCells.appendChild(cell);
     });
-    modal.appendChild(grid);
+    grid.appendChild(fragCells);
+  };
+  let active = 0;
+  const sync = () => { btns.forEach((b, i) => { b.disabled = i === active; }); };
+  btns.forEach((b, i) => { b.addEventListener('click', () => { active = i; sync(); renderGroup(active); }); });
+  modal.appendChild(tabs);
+  modal.appendChild(content);
+  renderGroup(active);
+  sync();
+  modal.tabIndex = -1;
+  try { modal.focus(); } catch {}
+  modal.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowLeft') { active = Math.max(0, active - 1); sync(); renderGroup(active); }
+    if (ev.key === 'ArrowRight') { active = Math.min(btns.length - 1, active + 1); sync(); renderGroup(active); }
   });
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -6954,8 +6999,8 @@ function openAuthGate() {
   };
   applyAuthGateLayout();
   try { if (window.__authGateResizeHandler) window.removeEventListener('resize', window.__authGateResizeHandler); } catch {}
-  window.__authGateResizeHandler = applyAuthGateLayout;
-  window.addEventListener('resize', applyAuthGateLayout);
+  window.__authGateResizeHandler = debounce(applyAuthGateLayout, 150);
+  window.addEventListener('resize', window.__authGateResizeHandler);
   const accountBtn = document.createElement('button');
   accountBtn.className = 'button';
   accountBtn.type = 'button';
