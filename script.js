@@ -3453,8 +3453,8 @@ function openSettings() {
   about.textContent = '關於遊戲';
   about.addEventListener('click', () => { openAbout(); });
   const preLogin = isPreLogin();
+  actions.appendChild(report);
   if (!preLogin) {
-    actions.appendChild(report);
     actions.appendChild(toHome);
     actions.appendChild(restart);
   }
