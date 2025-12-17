@@ -24,23 +24,28 @@ const _dc = document.getElementById('debugControls');
 if (_dc) _dc.style.display = 'none';
 const _da = debugLevelInput ? debugLevelInput.parentElement : null;
 if (_da) _da.style.display = 'none';
-let appVersion = '1.30';
+let appVersion = '1.31';
 let releaseNotes = [
-  '卡牌系統正式實裝：抽卡、背包、裝備、展示',
-  '圖鑑分組與永久解鎖：結算／場景／事件／卡片',
-  '登入頁隱藏貨幣；主頁顯示並長按提示獲取方式',
-  '每日首次登入自動簽到與月曆打勾；連續 5 天 +5',
-  '新帳號首次登入贈送免費一抽（遊客不適用）',
-  '開發者模式顯示無限貨幣'
+  '圖鑑排行榜整合至主頁排行榜彈窗',
+  '做夢關／迴光返照關題庫擴充 10 題',
+  'SSR 一血機制優化：裝備即一血提示',
+  '莊周夢蝶預確認流程：進入夢前詢問是否使用',
+  '第四關插圖解鎖邏輯修復：孟郊月下正常解鎖'
 ];
 let releaseHistory = {
+  '1.31': [
+    '圖鑑排行榜整合至主頁排行榜彈窗',
+    '做夢關／迴光返照關題庫擴充 10 題',
+    'SSR 一血機制優化：裝備即一血提示',
+    '莊周夢蝶預確認流程：進入夢前詢問是否使用',
+    '第四關插圖解鎖邏輯修復：孟郊月下正常解鎖'
+  ],
   '1.30': [
     '卡牌系統正式實裝：抽卡、背包、裝備、展示',
     '圖鑑分組與永久解鎖：結算／場景／事件／卡片',
     '登入頁隱藏貨幣；主頁顯示並長按提示獲取方式',
     '每日首次登入自動簽到與月曆打勾；連續 5 天 +5',
-    '新帳號首次登入贈送免費一抽（遊客不適用）',
-    '開發者模式顯示無限貨幣'
+    '新帳號首次登入贈送免費一抽（遊客不適用）'
   ],
   '1.22': [
     '介面體驗優化與穩定性改善',
@@ -64,6 +69,7 @@ let releaseHistory = {
   '1.1.2': ['設定面板新增音量滑桿；整合回報/首頁/重來/公告','移除下方固定回報按鈕以免遮擋'],
   '1.1.1': ['加入結算插圖（SS/S/A/B/C/D 等級對應）','SS 稀有特效強化：光暈、掃光、星粒與脈動','新增稱號等級與排行榜 SS 特效（SS：泰山北斗）','調整各關卡分數至新標準（總分 220，不含夢與返照）','強化全域文字對比，避免文字與背景相近','第十關起始延遲下墜 1.2 秒，提升反應時間','第九關玩法改為「段落排序」，說明已更新','測試卡暱稱顯示「測試卡」','套用冰室照片作為背景']
 };
+let noticeShownOnAuthGate = false;
 
 let matchScore = 0;
 let errorCount = 0;
@@ -85,6 +91,7 @@ let levelTransitioning = false;
 let customNumberFailText = null;
 let isHintUsedInLevel = false;
 let springHintUsedInRun = false;
+let dreamGambleAutoActivate = false;
 let mismatchCounter = 0;
 let bgmAudio = null;
 let bgmEnabled = true;
@@ -765,7 +772,7 @@ function handleError(levelType) {
     updateHpBar();
     try { sfxError(); sfxDamage(); } catch {}
     try { triggerShakeEffect(); } catch {}
-    if (errorCount === 1) {
+    if (errorCount === 1 && selectedCardId !== 'card_memorial') {
       showPunishOverlay();
       setTimeout(() => {
         errorLock = false;
@@ -829,6 +836,66 @@ function goToNextLevel() {
   const type = getLevelType(item);
   if (type === 'Number') currentLevel = item;
   if (type === 'Review') currentLevel = 10;
+  if (type === 'Dream' && selectedCardId === 'card_dream') {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-backdrop active-block';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    const close = document.createElement('button');
+    close.className = 'modal-close';
+    close.type = 'button';
+    close.textContent = '×';
+    const doSkip = () => {
+      try { document.body.removeChild(overlay); } catch {}
+      blockingModalOpen = false;
+      dreamGambleAutoActivate = false;
+      applyLevelStyle(type);
+      currentProgress = 'Dream';
+      updateCharacterDisplay();
+      showHpBar();
+      updateHpBar();
+      startDreamLevel();
+    };
+    close.addEventListener('click', doSkip);
+    const title = document.createElement('h2');
+    title.className = 'modal-title';
+    title.textContent = '提示';
+    const p = document.createElement('p');
+    p.className = 'dialog-text';
+    p.textContent = '是否使用莊周夢蝶觸發稀有事件？';
+    const actions = document.createElement('div');
+    actions.className = 'modal-actions';
+    const useBtn = document.createElement('button');
+    useBtn.className = 'button';
+    useBtn.type = 'button';
+    useBtn.textContent = '使用';
+    useBtn.addEventListener('click', () => {
+      dreamGambleAutoActivate = true;
+      try { document.body.removeChild(overlay); } catch {}
+      blockingModalOpen = false;
+      applyLevelStyle(type);
+      currentProgress = 'Dream';
+      updateCharacterDisplay();
+      showHpBar();
+      updateHpBar();
+      startDreamLevel();
+    });
+    const skipBtn = document.createElement('button');
+    skipBtn.className = 'button';
+    skipBtn.type = 'button';
+    skipBtn.textContent = '跳過';
+    skipBtn.addEventListener('click', doSkip);
+    actions.appendChild(useBtn);
+    actions.appendChild(skipBtn);
+    modal.appendChild(close);
+    modal.appendChild(title);
+    modal.appendChild(p);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    blockingModalOpen = true;
+    return;
+  }
   applyLevelStyle(type);
   if (type === 'Number') { currentLevelMistakes = 0; isHintUsedInLevel = false; }
   if (type === 'Number') currentProgress = `Level ${currentLevel}`;
@@ -922,6 +989,7 @@ function presentLevelIntro(titleText, descriptionText, onStart) {
 function startBuddhaBoneLevel() {
   applyLevelStyle('Number');
   updateCharacterDisplay();
+  if (selectedCardId === 'card_memorial') { hpMax = 1; }
   showHpBar();
   updateHpBar();
   const img = document.getElementById('characterImage');
@@ -1222,7 +1290,9 @@ function endP1(success) {
       courtDebuffNext = courtOpinionValue < 20;
       if (rageValue >= 100) {
         locked = true;
-        errorCount = Math.max(errorCount, 1);
+        if (selectedCardId === 'card_memorial') {
+          errorCount = Math.max(errorCount, 1);
+        }
         customNumberFailText = '遭斬';
         handleError('Number');
         return;
@@ -2209,6 +2279,16 @@ const dreamQuestionBank = [
   { q: '〈徐、泗、豪三州節度掌書記廳石記〉的主旨是？', options: ['說明節度使所轄三州的軍政情況', '強調書記一職的艱難與瑣碎', '讚揚南陽公與其三位掌書記文才相得、賓主和合', '記錄書記廳建成與刻石的過程'], correct: 2, explain: '文章以書記職任為引，實旨在稱頌南陽公文名冠世，且所辟三位書記皆「閎辨通敏」之才；又以賓主文章互為映照，氣合志同為文壇佳事，因此刻石以誌。' },
   { q: '下列何者最能概括〈畫記〉本文所強調的核心意義？', options: ['古代軍旅生活的艱困與戰爭場面的真實再現', '此畫以眾多人物與動物姿態展現工筆細緻、匠意群集的藝術價值', '作者在旅途中偶然獲得珍物，象徵命運的無常', '趙侍御憶起少年志業，反映仕途與抱負的落差'], correct: 1, explain: '全文詳記此畫所描繪人物、馬匹、器物之繁多與各異姿態，並強調其「非一工人所能運思」而是「藂集眾工之所長」，核心在凸顯作品的藝術高度與技藝之精妙。' },
   { q: '下列何者最能概括〈藍田縣丞廳壁記〉主旨？', options: ['讚揚藍田縣丞職位的重要性與權力之大', '揭示地方官署制度中「丞」名位不符、職權受限的困境', '記述崔斯立如何以文章與學識在京師顯名', '描述丞廳環境之優美與修繕後的煥然一新'], correct: 1, explain: '全文以「丞」職為核心，先寫其職責應廣，而實際權勢反被主簿、尉所制，名位不符；再敘崔斯立才學優異卻因制度安排而抱負難展，皆指向制度造成的職位困境，是全文的主旨所在。' },
+  { q: '〈新修滕王閣記〉最主要表達的中心思想為何？', options: ['韓愈藉由重修滕王閣，抒寫江南勝景之美與登臨之樂。', '韓愈追述滕王閣的歷史傳承，強調三王文章的文學價值。', '韓愈感慨仕途多舛，卻因王中丞的任事與治理，使民生大治，終得以補書記文。', '借重修滕王閣一事，讚頌王中丞廉能政績與不侈不廢的施政態度，並述自身得以為其立記的榮幸。'], correct: 3, explain: '重點在讚頌王中丞德政與不侈不廢之修閣，作者亦以得立記為榮。' },
+  { q: '〈科斗書後記〉一文的核心用意是什麼？', options: ['詳細考證科斗文與篆書、八分書的字形源流', '炫示韓愈家族在書法史上的卓越地位', '說明自己學習古文字、保存古書的完整成果', '交代古書傳承的因緣，並表明學古文字是為寫作與立言所需'], correct: 3, explain: '重點在傳承與用古：學古文字為銘述德、立言服務；敬重古書，不私有。' },
+  { q: '〈鄆州溪堂詩〉中，韓愈藉由敘事與詩歌主要要彰顯的是哪一核心觀念？', options: ['鄆州地理形勢險要，足以成為四方屏障', '馬公以武力鎮壓驕兵，迅速平定多年積亂', '善政須先以德化人，使眾心歸附，然後邦國自安', '建築溪堂的目的在於宴飲賓客、歌詠山水之樂'], correct: 2, explain: '德化先行、上勤下順，方能邦國既安；武力非治亂之本。' },
+  { q: '〈貓相乳〉一文中，韓愈藉由「貓相乳」的異事，主要要說明的是哪一核心思想？', options: ['動物亦具仁義之性，可與人相比', '奇異自然現象本身具有預示吉凶的功能', '有德之人能感化萬物，祥瑞乃德政所致', '家庭倫理秩序是治國成功的唯一條件'], correct: 2, explain: '否定動物本具仁義；以德政感通而致祥，《易》所謂「信及豚魚」。' },
+  { q: '〈爭臣論〉中，韓愈對諫議大夫陽城的主要批評是下列何者？', options: ['陽城學問不足，無法勝任諫官之職', '陽城品行雖高，卻以清高自守而曠其官責', '陽城諫言過於激烈，易招君上怨恨', '陽城貪戀俸祿，不願辭官歸隱'], correct: 1, explain: '在其位不任其職：諫官應盡言責，不可高潔而不諫政事。' },
+  { q: '〈改葬服議〉中，韓愈對「改葬時所服之服制」的核心主張為何？', options: ['改葬應依原本喪禮，恢復斬衰或重服', '改葬一律不服喪，以免加重哀戚', '改葬僅對父母服緦麻，其餘親屬不服', '改葬可視情況加重服制，以表孝心'], correct: 2, explain: '據《經》《穀梁》，改葬對父母服最輕緦麻，其餘不服；禮有進無退、以輕為宜。' },
+  { q: '〈省試學生代齋郎議〉中，韓愈反對以學生取代齋郎的最核心理由是什麼？', options: ['齋郎出身低賤，不宜由學生兼任', '學生人數不足，無法分擔齋郎之役', '以德藝之士從事力役，既失禮制又違教化', '宗廟之事過於瑣碎，無須專設齋郎'], correct: 2, explain: '君子之職在德藝教化，不宜服小人之事；不專不習，近於不敬宗廟。' },
+  { q: '〈禘祫議〉中，韓愈提出的核心主張是下列哪一項？', options: ['毀去獻、懿二祖廟主，以合於後世禮制', '將獻、懿二祖遷出太廟，改於陵所致祭', '禘祫時以獻祖居東向位，太祖景皇帝從昭穆', '另立新廟專祀獻、懿二祖，不再參與禘祫'], correct: 2, explain: '禘祫合祭當遵父子倫理：獻、懿祖居尊位；景皇帝以孫屈於祖，合乎禮與人情。' },
+  { q: '〈省試顏子不貳過論〉中，韓愈對「不貳過」的根本解釋是下列哪一項？', options: ['顏子天資近聖，因此一生幾乎沒有任何過失', '能在過失表現於言行前，於心念初萌即止絕', '嚴守外在禮法，所以不讓過錯反覆發生', '隱居陋巷、遠離世事，因此減少犯錯機會'], correct: 1, explain: '過在心念之萌，顏子能自覺自止，使過不入於言行，故稱不貳過。' },
+  { q: '〈與李秘書論小功不稅書〉中，韓愈對「小功不稅」的主要質疑重點是下列哪一項？', options: ['「小功不稅」本是聖人立禮，用以減輕喪服負擔', '「小功不稅」只適用於古代，今人不必再討論', '將「不稅」解為「不追服」，違背人情與孝道', '小功所涉親屬過遠，本就不應服喪'], correct: 2, explain: '誤解「不稅」為完全不補服，違人情與孝道；禮本於人情，不可以制度掩飾冷漠。' },
 ];
 
 function startDreamLevel() {
@@ -2225,8 +2305,9 @@ function startDreamLevel() {
   title.textContent = '做夢關：夢境試題';
   const dreamActions = document.createElement('div');
   dreamActions.className = 'actions';
+  let triggerBtn = null;
   if (selectedCardId === 'card_dream') {
-    const triggerBtn = document.createElement('button');
+    triggerBtn = document.createElement('button');
     triggerBtn.className = 'button';
     triggerBtn.type = 'button';
     triggerBtn.textContent = '觸發：莊周夢蝶（+10% 稀有事件）';
@@ -2236,6 +2317,12 @@ function startDreamLevel() {
       triggerBtn.textContent = '已觸發：莊周夢蝶';
     });
     dreamActions.appendChild(triggerBtn);
+    if (dreamGambleAutoActivate) {
+      dreamGambleActive = true;
+      dreamGambleAutoActivate = false;
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = '已觸發：莊周夢蝶';
+    }
   }
   const verAll = getCharacterVersion();
   const boost = dreamGambleActive ? 1.10 : 1.00;
@@ -2972,12 +3059,6 @@ function renderLeaderboardPage(filterRoute, headingText, skipRemote) {
     shareBtn.textContent = '分享結果';
     shareBtn.addEventListener('click', shareGameResult);
     actions.appendChild(shareBtn);
-    const galleryRankBtn = document.createElement('button');
-    galleryRankBtn.className = 'button';
-    galleryRankBtn.type = 'button';
-    galleryRankBtn.textContent = '圖鑑收集排行';
-    galleryRankBtn.addEventListener('click', renderUnlocksLeaderboardPage);
-    actions.appendChild(galleryRankBtn);
     if (headingText) page.appendChild(info);
     if (rankInfo.textContent) page.appendChild(rankInfo);
     page.appendChild(awInfo);
@@ -3145,33 +3226,74 @@ function openNotice() {
   const title = document.createElement('h2');
   title.className = 'modal-title';
   title.textContent = '公告';
-  const ver = document.createElement('p');
-  ver.className = 'dialog-text';
-  ver.textContent = `版本：${appVersion}`;
   modal.appendChild(close);
   modal.appendChild(title);
-  modal.appendChild(ver);
+  const tabs = document.createElement('div');
+  tabs.className = 'modal-actions';
+  const gameBtn = document.createElement('button');
+  gameBtn.className = 'button';
+  gameBtn.type = 'button';
+  gameBtn.textContent = '遊戲公告';
+  const updateBtn = document.createElement('button');
+  updateBtn.className = 'button';
+  updateBtn.type = 'button';
+  updateBtn.textContent = '更新公告';
+  tabs.appendChild(gameBtn);
+  tabs.appendChild(updateBtn);
+  const content = document.createElement('div');
+  content.className = 'dialog-container';
+  modal.appendChild(tabs);
+  modal.appendChild(content);
+  const renderGame = () => {
+    content.innerHTML = '';
+    const basicTitle = document.createElement('h3'); basicTitle.className = 'modal-title'; basicTitle.textContent = '遊戲公告';
+    const basic1 = document.createElement('p'); basic1.className = 'dialog-text'; basic1.textContent = '歡迎來到寒流世界！註冊帳號首次登入送免費一抽！';
+    const basic2 = document.createElement('p'); basic2.className = 'dialog-text'; basic2.textContent = '警告！遊戲內容雖有設後台儲存資料，但仍可能無法完全跨裝置保存，敬請見諒。';
+    content.appendChild(basicTitle);
+    content.appendChild(basic1);
+    content.appendChild(basic2);
+  };
+  const renderUpdate = () => {
+    content.innerHTML = '';
+    const updateTitle = document.createElement('h3'); updateTitle.className = 'modal-title'; updateTitle.textContent = '更新公告';
+    const ver = document.createElement('p'); ver.className = 'dialog-text'; ver.textContent = `版本：${appVersion}`;
+    content.appendChild(updateTitle);
+    content.appendChild(ver);
+    try {
+      const versions = Object.keys(releaseHistory).sort((a, b) => {
+        const pa = a.split('.').map(Number); const pb = b.split('.').map(Number);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+          const da = pa[i] || 0; const db = pb[i] || 0; if (da !== db) return db - da;
+        }
+        return 0;
+      });
+      versions.forEach(v => {
+        const vh = document.createElement('p');
+        vh.className = 'dialog-text';
+        vh.textContent = `版本 ${v}`;
+        content.appendChild(vh);
+        const items = Array.isArray(releaseHistory[v]) ? releaseHistory[v] : [];
+        items.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; content.appendChild(p); });
+      });
+    } catch {
+      releaseNotes.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; content.appendChild(p); });
+    }
+  };
+  let activeTab = 'game';
+  const syncButtons = () => {
+    gameBtn.disabled = (activeTab === 'game');
+    updateBtn.disabled = (activeTab === 'update');
+  };
+  gameBtn.addEventListener('click', () => { activeTab = 'game'; syncButtons(); renderGame(); });
+  updateBtn.addEventListener('click', () => { activeTab = 'update'; syncButtons(); renderUpdate(); });
+  renderGame();
+  syncButtons();
   try {
-    const versions = Object.keys(releaseHistory).sort((a, b) => {
-      const pa = a.split('.').map(Number); const pb = b.split('.').map(Number);
-      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-        const da = pa[i] || 0; const db = pb[i] || 0; if (da !== db) return db - da;
-      }
-      return 0;
-    });
-    versions.forEach(v => {
-      const vh = document.createElement('p');
-      vh.className = 'dialog-text';
-      vh.textContent = `版本 ${v}`;
-      modal.appendChild(vh);
-      const items = Array.isArray(releaseHistory[v]) ? releaseHistory[v] : [];
-      items.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; modal.appendChild(p); });
-    });
+    document.body.appendChild(overlay);
   } catch {
-    releaseNotes.forEach(n => { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = `• ${n}`; modal.appendChild(p); });
+    document.body.appendChild(overlay);
   }
   overlay.appendChild(modal);
-  document.body.appendChild(overlay);
 }
 
 function openSettings() {
@@ -3568,6 +3690,58 @@ function displayLeaderboard(filterRoute, skipRemote) {
     }
   }
   leaderboardFilter = filterRoute || 'All';
+  backdrop.hidden = false;
+}
+
+async function displayUnlocksLeaderboardInModal() {
+  const content = document.getElementById('leaderboardContent');
+  const titleEl = document.getElementById('modalTitle');
+  if (content) {
+    content.innerHTML = '';
+    const info = document.createElement('p');
+    info.className = 'dialog-text';
+    const accounts = loadAccountsList();
+    const allKeys = getIllustrationList();
+    const stats = [];
+    const pushStat = (acc, items) => {
+      const set = new Set(items);
+      const count = allKeys.reduce((n, k) => n + (set.has(k) ? 1 : 0), 0);
+      const pct = allKeys.length ? Math.round((count / allKeys.length) * 100) : 0;
+      stats.push({ id: acc.id, name: acc.name || acc.id, count, pct });
+    };
+    for (const acc of accounts) {
+      let items = await fetchUnlocksForAccountId(acc.id);
+      if (!items.length) items = getLocalUnlocksForAccountId(acc.id);
+      pushStat(acc, items);
+    }
+    if (!accounts.length) {
+      const guestSet = getCurrentUnlocksSet();
+      const count = Array.from(guestSet).length;
+      const pct = allKeys.length ? Math.round((count / allKeys.length) * 100) : 0;
+      stats.push({ id: 'guest', name: localStorage.getItem('hanliu_player_name') || '無名', count, pct });
+    }
+    stats.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    info.textContent = `圖鑑收集排行｜總圖鑑項目：${allKeys.length}｜帳號數：${accounts.length || 1}`;
+    content.appendChild(info);
+    stats.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = `${i + 1}. ${s.name}`;
+      const score = document.createElement('span');
+      score.className = 'score';
+      score.textContent = `${s.count}`;
+      const route = document.createElement('span');
+      route.className = 'route';
+      route.textContent = `${s.pct}%`;
+      row.appendChild(name);
+      row.appendChild(score);
+      row.appendChild(route);
+      content.appendChild(row);
+    });
+  }
+  if (titleEl) titleEl.textContent = '排行榜';
   backdrop.hidden = false;
 }
 
@@ -4836,6 +5010,7 @@ function start() {
     const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
     hpMax = (selectedCardId === 'card_memorial' ? 1 : 2);
     springHintUsedInRun = false;
+    dreamGambleAutoActivate = false;
     resetHpBar();
     createDialogContainer(playerName);
   });
@@ -5288,6 +5463,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !backdro
 rankHan.addEventListener('click', () => { displayLeaderboard('HanYu'); });
 rankLiu.addEventListener('click', () => { displayLeaderboard('LiuZongyuan'); });
 rankAll.addEventListener('click', () => { displayLeaderboard('All'); });
+const galleryRankBtnHome = document.getElementById('galleryRankBtnHome');
+if (galleryRankBtnHome) galleryRankBtnHome.addEventListener('click', () => { try { displayUnlocksLeaderboardInModal(); } catch { renderUnlocksLeaderboardPage(); } });
 document.getElementById('rankClear').addEventListener('click', clearLeaderboard);
 const rankClearAllBtn = document.getElementById('rankClearAll');
 if (rankClearAllBtn) rankClearAllBtn.addEventListener('click', clearLeaderboardAll);
@@ -5552,7 +5729,7 @@ function updateHpBar() {
   if (fill) fill.style.width = pct + '%';
   if (text) text.textContent = `${remain}/${hpMax}`;
 }
-function getSelectedCardLevelBonus() { return selectedCardId ? 10 : 0; }
+function getSelectedCardLevelBonus() { return 0; }
 function applyLevelClear(levelEl, baseScore) {
   if (levelTransitioning) return;
   levelTransitioning = true;
@@ -5575,6 +5752,9 @@ function applyLevelClear(levelEl, baseScore) {
   if (selectedCardId === 'card_memorial') {
     gain += 10;
     hintMsg = hintMsg ? (hintMsg + '｜殘年除弊：額外獲得 +10 分') : '殘年除弊：額外獲得 +10 分';
+  }
+  if (currentLevel === 4) {
+    try { unlockIllustration('mengjiao_moon.png'); } catch {}
   }
   bumpScore(gain);
   if (levelEl) { levelEl.style.display = 'none'; levelEl.style.pointerEvents = 'none'; }
@@ -5624,6 +5804,7 @@ function startDebugLevel() {
   currentLevelIndex = Array.isArray(gameFlow) ? gameFlow.indexOf(n) : -1;
   matchScore = (n - 1) * 10;
   springHintUsedInRun = false;
+  dreamGambleAutoActivate = false;
   resetHpBar();
   startNumberLevel(n);
 }
@@ -6805,6 +6986,9 @@ function openAuthGate() {
   actions.appendChild(accountBtn);
   actions.appendChild(guestBtn);
   main.appendChild(actions);
+  try {
+    if (!noticeShownOnAuthGate) { noticeShownOnAuthGate = true; openNotice(); }
+  } catch {}
 }
 
 try { openAuthGate(); } catch {}
