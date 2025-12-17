@@ -3960,6 +3960,12 @@ function openRouteDialog(route) {
     nextBtn.type = 'button';
     nextBtn.textContent = '進入第一關：句讀';
     container.appendChild(nextBtn);
+  } else {
+    const backBtn = document.createElement('button');
+    backBtn.className = 'button';
+    backBtn.type = 'button';
+    backBtn.textContent = '返回首頁';
+    container.appendChild(backBtn);
   }
   const main = document.querySelector('main.container');
   main.appendChild(container);
@@ -3970,6 +3976,12 @@ function openRouteDialog(route) {
       container.style.display = 'none';
       currentLevelIndex = -1;
       goToNextLevel();
+    });
+  } else {
+    const backBtn = container.querySelector('.button');
+    if (backBtn) backBtn.addEventListener('click', () => {
+      container.style.display = 'none';
+      navigateHome();
     });
   }
 }
@@ -4903,15 +4915,15 @@ function startLetterMazeLevel() {
           return;
         }
         const prev = grid.querySelector(`[data-index="${playerPos}"]`);
-        // 清理任何殘留的玩家標記
-        grid.querySelectorAll('.maze-cell.player').forEach(p => {
-          p.classList.remove('player');
-          if (p.dataset.type === 'start' || p.dataset.type === 'path') p.textContent = '...';
-          if (p.dataset.type === 'g1' || p.dataset.type === 'g2' || p.dataset.type === 'g3') {
-            p.textContent = state.achieved[p.dataset.type] ? '✅' : '函';
-          }
-        });
         if (type === 'path') {
+          if (prev) {
+            prev.classList.remove('player');
+            if (prev.dataset.type === 'start' || prev.dataset.type === 'path') prev.textContent = '...';
+            if (prev.dataset.type === 'g1' || prev.dataset.type === 'g2' || prev.dataset.type === 'g3') {
+              prev.textContent = state.achieved[prev.dataset.type] ? '✅' : '函';
+            }
+            if (prev.dataset.type === 'final') prev.textContent = '公府';
+          }
           cell.textContent = '🚶';
           cell.classList.add('player');
           playerPos = idx;
@@ -4930,6 +4942,14 @@ function startLetterMazeLevel() {
           const gi = Number(currentLetterGoal) - 1;
           showBlockModal('提示', [{ text: goals[gi].feedback }]);
           state.achieved[type] = true;
+          if (prev) {
+            prev.classList.remove('player');
+            if (prev.dataset.type === 'start' || prev.dataset.type === 'path') prev.textContent = '...';
+            if (prev.dataset.type === 'g1' || prev.dataset.type === 'g2' || prev.dataset.type === 'g3') {
+              prev.textContent = state.achieved[prev.dataset.type] ? '✅' : '函';
+            }
+            if (prev.dataset.type === 'final') prev.textContent = '公府';
+          }
           cell.classList.add('done');
           cell.textContent = '🚶';
           cell.style.pointerEvents = 'none';
@@ -4945,6 +4965,14 @@ function startLetterMazeLevel() {
             const origin = grid.querySelector(`[data-index="${playerPos}"]`);
             if (origin) { origin.classList.add('player'); origin.textContent = '🚶'; }
             return;
+          }
+          if (prev) {
+            prev.classList.remove('player');
+            if (prev.dataset.type === 'start' || prev.dataset.type === 'path') prev.textContent = '...';
+            if (prev.dataset.type === 'g1' || prev.dataset.type === 'g2' || prev.dataset.type === 'g3') {
+              prev.textContent = state.achieved[prev.dataset.type] ? '✅' : '函';
+            }
+            if (prev.dataset.type === 'final') prev.textContent = '公府';
           }
           cell.textContent = '🚶';
           playerPos = idx;
