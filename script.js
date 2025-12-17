@@ -3943,6 +3943,72 @@ function openAbout() {
   document.body.appendChild(overlay);
 }
 
+async function openAutoTest() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '自動測試';
+  const status = document.createElement('div');
+  status.className = 'actions';
+  status.style.flexDirection = 'column';
+  status.style.alignItems = 'stretch';
+  status.style.justifyContent = 'flex-start';
+  status.style.gap = '0.5rem';
+  const append = (text, ok) => {
+    const p = document.createElement('p');
+    p.className = 'dialog-text';
+    p.textContent = `${ok ? '✅' : '❌'} ${text}`;
+    status.appendChild(p);
+  };
+  try {
+    let ok = false;
+    try { localStorage.setItem('hanliu_self_test', 'ok'); ok = (localStorage.getItem('hanliu_self_test') === 'ok'); } catch {}
+    append('本機儲存可用', ok);
+  } catch { append('本機儲存可用', false); }
+  try {
+    initBgm();
+    append('音樂元件已建立', !!bgmAudio);
+  } catch { append('音樂元件已建立', false); }
+  try {
+    const startBtn = document.getElementById('startBtn');
+    const leaderboardBtn = document.getElementById('leaderboardBtn');
+    const drawCardBtn = document.getElementById('drawCardBtn');
+    const cardManagerBtn = document.getElementById('cardManagerBtn');
+    append('主要按鈕存在：開始遊戲', !!startBtn);
+    append('主要按鈕存在：排行榜', !!leaderboardBtn);
+    append('主要按鈕存在：筆墨祈願', !!drawCardBtn);
+    append('主要按鈕存在：卡片背包', !!cardManagerBtn);
+  } catch {
+    append('主要按鈕檢查', false);
+  }
+  try {
+    const ep = getCloudEndpoint();
+    if (ep) {
+      let ok = false;
+      try {
+        const r = await fetch(ep, { method: 'GET', mode: 'cors' });
+        ok = !!r;
+      } catch { ok = false; }
+      append(`雲端端點連線：${ep}`, ok);
+    } else {
+      append('雲端端點設定缺失', false);
+    }
+  } catch { append('雲端端點連線', false); }
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(status);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
 function openRouteDialog(route) {
   const container = document.createElement('section');
   container.className = 'dialog-container';
@@ -5522,6 +5588,8 @@ if (noticeBtn) noticeBtn.addEventListener('click', openNotice);
 if (rankImportBtn) rankImportBtn.addEventListener('click', () => { if (rankFileInput) rankFileInput.click(); });
 if (rankFileInput) rankFileInput.addEventListener('change', importLeaderboard);
 if (aboutBtn) aboutBtn.addEventListener('click', openAbout);
+const autoTestBtn = document.getElementById('autoTestBtn');
+if (autoTestBtn) autoTestBtn.addEventListener('click', openAutoTest);
 const aboutParent = aboutBtn ? aboutBtn.parentElement : null;
 {
   const host = aboutParent || document.querySelector('#startScreen .actions');
