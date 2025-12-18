@@ -237,6 +237,7 @@ function setSelectedCard(id) { selectedCardId = id || ''; try { localStorage.set
 function ensureDefaultExileCard() {}
 function renderSelectCardArea() {
   if (!selectCardArea) return;
+  selectCardArea.hidden = false;
   const inv = loadInventory();
   selectCardArea.innerHTML = '';
   if (!inv.length) { const p = document.createElement('p'); p.className = 'dialog-text'; p.textContent = '裝備卡片：尚未獲得卡片'; selectCardArea.appendChild(p); return; }
@@ -338,6 +339,21 @@ function openCardManager() {
   render();
   const actions = document.createElement('div'); actions.className = 'actions';
   const closeBtn = document.createElement('button'); closeBtn.className = 'button'; closeBtn.type = 'button'; closeBtn.textContent = '關閉'; closeBtn.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const full = inv.length >= getInventoryLimit() && !devModeEnabled;
+  if (full) {
+    const organizeBtn = document.createElement('button');
+    organizeBtn.className = 'button';
+    organizeBtn.type = 'button';
+    organizeBtn.textContent = '一鍵整理';
+    organizeBtn.addEventListener('click', () => { sortInventory(); render(); });
+    const dismantleBtn = document.createElement('button');
+    dismantleBtn.className = 'button';
+    dismantleBtn.type = 'button';
+    dismantleBtn.textContent = '一鍵分解';
+    dismantleBtn.addEventListener('click', () => { decomposeLowRarity(); render(); });
+    actions.appendChild(organizeBtn);
+    actions.appendChild(dismantleBtn);
+  }
   actions.appendChild(closeBtn);
   modal.appendChild(close);
   modal.appendChild(title);
@@ -348,6 +364,301 @@ function openCardManager() {
   document.body.appendChild(overlay);
 }
 if (cardManagerBtn) cardManagerBtn.addEventListener('click', openCardManager);
+
+function openInventoryCardDetail(id) {
+  const c = CARD_DATA.find(x => x.id === id);
+  if (!c) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = c.name;
+  const content = document.createElement('div');
+  content.style.textAlign = 'left';
+  content.style.marginBottom = '1rem';
+  const desc = document.createElement('p');
+  desc.className = 'dialog-text';
+  desc.textContent = c.desc;
+  const rar = document.createElement('p');
+  rar.className = 'dialog-text';
+  rar.textContent = `稀有度：${c.rarity}`;
+  content.appendChild(rar);
+  content.appendChild(desc);
+  if (c.effectType) {
+    const eff = document.createElement('p');
+    eff.className = 'dialog-text';
+    eff.style.color = '#6ea3b5';
+    eff.textContent = `效果：${c.effectType}`;
+    content.appendChild(eff);
+  }
+  const cardContainer = document.createElement('div');
+  cardContainer.className = 'card3d';
+  cardContainer.style.margin = '0 auto 1rem auto';
+  const faceFront = document.createElement('div');
+  faceFront.className = `face front rar-${c.rarity}`;
+  faceFront.textContent = c.name;
+  const faceBack = document.createElement('div');
+  faceBack.className = `face back rar-${c.rarity}`;
+  const img = document.createElement('img');
+  img.src = getCardImage(id);
+  img.alt = c.name;
+  img.className = 'card-img';
+  img.onerror = () => { try { faceBack.removeChild(img); } catch {} };
+  faceBack.appendChild(img);
+  cardContainer.appendChild(faceFront);
+  cardContainer.appendChild(faceBack);
+  cardContainer.addEventListener('click', () => cardContainer.classList.toggle('flip'));
+
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(cardContainer);
+  modal.appendChild(content);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function attachDrawCardInteractions(el, rarity, id, unused, isDraw) {
+  el.addEventListener('click', () => { el.classList.toggle('flip'); });
+  let t;
+  const start = () => { t = setTimeout(() => { try { openInventoryCardDetail(id); } catch {} }, 800); };
+  const end = () => { clearTimeout(t); };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointerleave', end);
+  el.addEventListener('touchstart', start);
+  el.addEventListener('touchend', end);
+}
+
+function getInventoryLimit() { return devModeEnabled ? Infinity : 5; }
+function addCardToInventory(id) {
+  const arr = loadInventory();
+  if (!arr.includes(id)) {
+    if (arr.length >= getInventoryLimit()) return false;
+    arr.push(id);
+    saveInventory(arr);
+  }
+  return true;
+}
+function sortInventory() {
+  const arr = loadInventory();
+  const rank = { SSR: 3, SR: 2, R: 1, N: 0 };
+  arr.sort((a, b) => {
+    const ra = rank[getCardRarity(a)] || 0;
+    const rb = rank[getCardRarity(b)] || 0;
+    if (rb !== ra) return rb - ra;
+    return getCardName(a).localeCompare(getCardName(b));
+  });
+  saveInventory(arr);
+}
+function decomposeLowRarity() {
+  const arr = loadInventory();
+  const kept = arr.filter(id => getCardRarity(id) !== 'N');
+  saveInventory(kept);
+  if (selectedCardId && kept.indexOf(selectedCardId) < 0) setSelectedCard('');
+}
+function getRarityRank(r) { const m = { SSR: 3, SR: 2, R: 1, N: 0 }; return m[r] || 0; }
+function compareByRarity(a, b) {
+  const ra = getRarityRank(getCardRarity(a));
+  const rb = getRarityRank(getCardRarity(b));
+  if (rb !== ra) return rb - ra;
+  return getCardName(a).localeCompare(getCardName(b));
+}
+function getSortMode() {
+  try { return localStorage.getItem(storageKey('inv_sort_mode')) || 'order'; } catch { return 'order'; }
+}
+function setSortMode(m) {
+  try { localStorage.setItem(storageKey('inv_sort_mode'), m === 'rarity' ? 'rarity' : 'order'); } catch {}
+}
+function getDecomposeThreshold() {
+  try { return localStorage.getItem(storageKey('inv_decompose_threshold')) || 'none'; } catch { return 'none'; }
+}
+function setDecomposeThreshold(v) {
+  const ok = ['none','N','R','SR'].includes(String(v));
+  try { localStorage.setItem(storageKey('inv_decompose_threshold'), ok ? String(v) : 'none'); } catch {}
+}
+function decomposeBelow(threshold) {
+  const t = String(threshold || 'none');
+  if (t === 'none') return;
+  const limit = { N: 0, R: 1, SR: 2 }[t];
+  const arr = loadInventory();
+  const kept = arr.filter(id => getRarityRank(getCardRarity(id)) > limit);
+  saveInventory(kept);
+  if (selectedCardId && kept.indexOf(selectedCardId) < 0) setSelectedCard('');
+}
+function renderDrawResults(container, results) {
+  const grid = document.createElement('div');
+  grid.className = 'draw-grid';
+  results.forEach((c) => {
+    const card = document.createElement('div');
+    card.className = 'card3d';
+    const front = document.createElement('div');
+    front.className = `face front rar-${c.rarity}`;
+    front.textContent = c.name;
+    const back = document.createElement('div');
+    back.className = `face back rar-${c.rarity}`;
+    const img = document.createElement('img');
+    img.src = getCardImage(c.id);
+    img.alt = c.name;
+    img.className = 'card-img';
+    img.onerror = () => { try { back.removeChild(img); } catch {} };
+    back.appendChild(img);
+    card.appendChild(front);
+    card.appendChild(back);
+    attachDrawCardInteractions(card, c.rarity, c.id, null, true);
+    grid.appendChild(card);
+  });
+  const tip = document.createElement('p');
+  tip.className = 'dialog-text';
+  tip.textContent = '提示：點擊翻面；長按查看詳情';
+  container.appendChild(tip);
+  container.appendChild(grid);
+}
+function performDraw(count) {
+  const list = [];
+  for (let i = 0; i < count; i++) {
+    const c = drawCard();
+    list.push(c);
+    addCardToInventory(c.id);
+  }
+  renderSelectCardArea();
+  return list;
+}
+function openDrawPrompt() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop active-block';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '筆墨祈願';
+  const rateText = document.createElement('p');
+  rateText.className = 'dialog-text';
+  rateText.textContent = '出率：SSR 5%｜SR 20%｜R 40%｜N 35%';
+  const costText = document.createElement('p');
+  costText.className = 'dialog-text';
+  const freeDone = !!localStorage.getItem(storageKey('first_draw_done'));
+  const hasFree = isAccountBound() && !freeDone;
+  costText.textContent = devModeEnabled ? '開發者模式：免費' : (hasFree ? '首次登入：免費一抽' : '單抽消耗 1｜十連消耗 10');
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const singleBtn = document.createElement('button');
+  singleBtn.className = 'button';
+  singleBtn.type = 'button';
+  singleBtn.textContent = '單抽';
+  const tenBtn = document.createElement('button');
+  tenBtn.className = 'button';
+  tenBtn.type = 'button';
+  tenBtn.textContent = '十連抽';
+  const backBtn = document.createElement('button');
+  backBtn.className = 'button';
+  backBtn.type = 'button';
+  backBtn.textContent = '返回首頁';
+  const resultWrap = document.createElement('div');
+  const afterDraw = (n) => {
+    resultWrap.innerHTML = '';
+    const items = performDraw(n);
+    renderDrawResults(resultWrap, items);
+    const note = document.createElement('p');
+    note.className = 'dialog-text';
+    const inv = loadInventory();
+    if (inv.length >= getInventoryLimit() && !devModeEnabled) {
+      note.textContent = `背包已滿（上限 ${getInventoryLimit()} 張），超出部分不加入。`;
+    } else {
+      note.textContent = '已加入背包，可至「卡片背包」裝備。';
+    }
+    resultWrap.appendChild(note);
+    const invNow = loadInventory();
+    const fullNow = invNow.length >= getInventoryLimit() && !devModeEnabled;
+    if (fullNow) {
+      const fixes = document.createElement('div');
+      fixes.className = 'actions';
+      const organizeBtn = document.createElement('button');
+      organizeBtn.className = 'button';
+      organizeBtn.type = 'button';
+      organizeBtn.textContent = '一鍵整理';
+      organizeBtn.addEventListener('click', () => { sortInventory(); renderSelectCardArea(); fixes.remove(); });
+      const depLabel = document.createElement('span');
+      depLabel.className = 'dialog-text';
+      depLabel.textContent = '自動分解：';
+      const depSelect = document.createElement('select');
+      const optNone = document.createElement('option'); optNone.value = 'none'; optNone.textContent = '不分解';
+      const optN = document.createElement('option'); optN.value = 'N'; optN.textContent = '分解 N';
+      const optR = document.createElement('option'); optR.value = 'R'; optR.textContent = '分解 R 以下';
+      const optSR = document.createElement('option'); optSR.value = 'SR'; optSR.textContent = '分解 SR 以下';
+      depSelect.appendChild(optNone); depSelect.appendChild(optN); depSelect.appendChild(optR); depSelect.appendChild(optSR);
+      depSelect.value = getDecomposeThreshold();
+      depSelect.addEventListener('change', () => { setDecomposeThreshold(depSelect.value); });
+      const depRun = document.createElement('button');
+      depRun.className = 'button';
+      depRun.type = 'button';
+      depRun.textContent = '執行分解';
+      depRun.addEventListener('click', () => { decomposeBelow(depSelect.value); renderSelectCardArea(); fixes.remove(); });
+      fixes.appendChild(organizeBtn);
+      fixes.appendChild(depLabel);
+      fixes.appendChild(depSelect);
+      fixes.appendChild(depRun);
+      resultWrap.appendChild(fixes);
+      const pref = getDecomposeThreshold();
+      if (pref !== 'none') {
+        decomposeBelow(pref);
+        renderSelectCardArea();
+        const autoMsg = document.createElement('p');
+        autoMsg.className = 'dialog-text';
+        autoMsg.textContent = `已依偏好自動分解（${pref === 'N' ? 'N' : pref + ' 以下'}）。`;
+        resultWrap.appendChild(autoMsg);
+      }
+    }
+    sfxCoin();
+  };
+  const spend = (need) => {
+    if (devModeEnabled) return true;
+    if (userCoins < need) {
+      showBlockModal('提示', [{ text: '貨幣不足。可透過每日領賞或結算獲取。' }]);
+      return false;
+    }
+    userCoins -= need;
+    saveCoins();
+    updateCoinsDisplay();
+    return true;
+  };
+  singleBtn.addEventListener('click', () => {
+    if (blockingModalOpen) return;
+    const free = isAccountBound() && !localStorage.getItem(storageKey('first_draw_done'));
+    if (!free && !spend(1)) return;
+    if (free) { try { localStorage.setItem(storageKey('first_draw_done'), '1'); } catch {} }
+    afterDraw(1);
+  });
+  tenBtn.addEventListener('click', () => {
+    if (blockingModalOpen) return;
+    if (!spend(10)) return;
+    afterDraw(10);
+  });
+  backBtn.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  actions.appendChild(singleBtn);
+  actions.appendChild(tenBtn);
+  actions.appendChild(backBtn);
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(rateText);
+  modal.appendChild(costText);
+  modal.appendChild(actions);
+  modal.appendChild(resultWrap);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+if (drawCardBtn) drawCardBtn.addEventListener('click', openDrawPrompt);
 
 function initBgm() {
   if (bgmAudio) return;
@@ -732,17 +1043,16 @@ function finalizeGame() {
 }
 
 function consumeCard() {
-  if (selectedCardId === 'card_dream') {
-    try {
-      const raw = localStorage.getItem('hanliu_inventory');
-      let arr = raw ? JSON.parse(raw) : [];
-      const idx = arr.indexOf('card_dream');
-      if (idx >= 0) {
-        arr.splice(idx, 1);
-        localStorage.setItem('hanliu_inventory', JSON.stringify(arr));
-      }
-    } catch {}
-  }
+  try {
+    if (!selectedCardId) return;
+    const inv = loadInventory();
+    const idx = inv.indexOf(selectedCardId);
+    if (idx >= 0) {
+      inv.splice(idx, 1);
+      saveInventory(inv);
+    }
+    setSelectedCard('');
+  } catch {}
 }
 
 function handleError(levelType) {
@@ -783,13 +1093,13 @@ function handleError(levelType) {
       }, 2000);
       return;
     }
-    if (hpMax === 1 && selectedCardId === 'card_survive' && !surviveNegationUsed) {
+    if (selectedCardId === 'card_survive' && !surviveNegationUsed && (hpMax - errorCount <= 1)) {
       surviveNegationUsed = true;
       levelScoreSuppressed = true;
       updateHpBar();
       try { sfxError(); } catch {}
       showPunishOverlay();
-      showBlockModal('提示', [{ text: '蠻荒餘生：抵銷一次一血傷害。本關結算分數為 0。' }]);
+      showBlockModal('提示', [{ text: '蠻荒餘生：抵銷一次致死傷害。本關結算分數為 0。' }]);
       setTimeout(() => {
         errorLock = false;
         if (currentLevel === 8 && typeof window.level8Reset === 'function') { window.level8Reset(); }
@@ -3220,6 +3530,20 @@ function clearMainContent(preserveStartScreen) {
 function navigateHome() {
   const main = document.querySelector('main.container');
   const start = document.getElementById('startScreen');
+  
+  // Cleanup overlays
+  const overlays = document.querySelectorAll('.modal-backdrop, .flash-overlay, .punish-overlay, .countdown-overlay');
+  overlays.forEach(el => {
+    if (el.id !== 'modalBackdrop') {
+      try { el.remove(); } catch {}
+    } else {
+      el.hidden = true;
+      el.classList.remove('active-block');
+      el.classList.remove('confirm');
+    }
+  });
+  blockingModalOpen = false;
+
   Array.from(main.children).forEach(ch => { if (!start || ch !== start) ch.remove(); });
   if (start) { start.style.display = ''; }
   document.documentElement.style.setProperty('--bg', '#1a1a1a');
@@ -5131,6 +5455,7 @@ function start() {
     const hsv = document.getElementById('homeSfxVolume'); if (hsv) hsv.hidden = true;
     const hvb = document.getElementById('homeVolumeToggle'); if (hvb) hvb.hidden = true;
     hpMax = (selectedCardId === 'card_memorial' ? 1 : 2);
+    startTime = Date.now();
     springHintUsedInRun = false;
     dreamGambleAutoActivate = false;
     resetHpBar();
@@ -7147,4 +7472,155 @@ function openAuthGate() {
   } catch {}
 }
 
-try { openAuthGate(); } catch {}
+
+const _wireCardUi = () => {
+  const drawCardBtn = document.getElementById('drawCardBtn');
+  if (drawCardBtn) drawCardBtn.addEventListener('click', () => {
+    showBlockModal('功能開發中', [{ text: '祈願卡片系統尚未開放' }], () => {});
+  });
+  const cardManagerBtn = document.getElementById('cardManagerBtn');
+  if (cardManagerBtn) cardManagerBtn.addEventListener('click', openCardManager);
+};
+_wireCardUi();
+function storageKeyInventory(base) {
+  try {
+    const acc = getStoredAccount();
+    const id = acc && acc.id ? String(acc.id) : '';
+    if (id) return `hanliu_${id}_${base}`;
+  } catch {}
+  return `hanliu_guest_${base}`;
+}
+function loadInventory() {
+  try {
+    const raw = localStorage.getItem(storageKeyInventory('inventory_v2'));
+    const arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) return arr.filter(x => x && typeof x.id === 'string');
+    return [];
+  } catch { return []; }
+}
+function saveInventory(items) {
+  try { localStorage.setItem(storageKeyInventory('inventory_v2'), JSON.stringify(Array.isArray(items) ? items : [])); } catch {}
+}
+function getRarityRank(r) {
+  const s = String(r || '').toUpperCase();
+  if (s === 'SSR') return 3;
+  if (s === 'SR') return 2;
+  if (s === 'R') return 1;
+  if (s === 'N') return 0;
+  return 0;
+}
+function sortInventoryByAcquire() {
+  const items = loadInventory();
+  items.sort((a, b) => Number(a && a.ts || 0) - Number(b && b.ts || 0));
+  saveInventory(items);
+}
+function sortInventoryByRarity() {
+  const items = loadInventory();
+  items.sort((a, b) => {
+    const rb = getRarityRank(b && b.rarity);
+    const ra = getRarityRank(a && a.rarity);
+    if (rb !== ra) return rb - ra;
+    return Number(a && a.ts || 0) - Number(b && b.ts || 0);
+  });
+  saveInventory(items);
+}
+function getAutoDecomposeThreshold() {
+  try { return String(localStorage.getItem(storageKeyInventory('auto_decompose_threshold')) || ''); } catch { return ''; }
+}
+function setAutoDecomposeThreshold(v) {
+  try { if (v) localStorage.setItem(storageKeyInventory('auto_decompose_threshold'), v); else localStorage.removeItem(storageKeyInventory('auto_decompose_threshold')); } catch {}
+}
+function applyAutoDecompose() {
+  const th = getAutoDecomposeThreshold();
+  if (!th) return;
+  const limit = getRarityRank(th);
+  const items = loadInventory();
+  const kept = items.filter(it => getRarityRank(it && it.rarity) > limit);
+  saveInventory(kept);
+}
+function openCardManager() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  const close = document.createElement('button');
+  close.className = 'modal-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.addEventListener('click', () => { try { document.body.removeChild(overlay); } catch {} });
+  const title = document.createElement('h2');
+  title.className = 'modal-title';
+  title.textContent = '卡片背包';
+  const list = document.createElement('div');
+  list.style.display = 'grid';
+  list.style.gridTemplateColumns = 'repeat(auto-fill, minmax(180px, 1fr))';
+  list.style.gap = '8px';
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  const sortAcquireBtn = document.createElement('button');
+  sortAcquireBtn.className = 'button';
+  sortAcquireBtn.type = 'button';
+  sortAcquireBtn.textContent = '按獲得順序排序';
+  const sortRarityBtn = document.createElement('button');
+  sortRarityBtn.className = 'button';
+  sortRarityBtn.type = 'button';
+  sortRarityBtn.textContent = '按稀有度排序';
+  const thLabel = document.createElement('span');
+  thLabel.className = 'dialog-text';
+  thLabel.textContent = '自動分解門檻：';
+  const thSelect = document.createElement('select');
+  thSelect.className = 'input';
+  ['','N','R','SR','SSR'].forEach((v) => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v ? `${v} 及以下` : '不分解';
+    thSelect.appendChild(opt);
+  });
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'button';
+  applyBtn.type = 'button';
+  applyBtn.textContent = '一鍵分解';
+  function renderList() {
+    const items = loadInventory();
+    list.innerHTML = '';
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.className = 'dialog-text';
+      empty.textContent = '背包目前為空';
+      list.appendChild(empty);
+      return;
+    }
+    items.forEach((it) => {
+      const cell = document.createElement('div');
+      cell.style.border = '1px solid #2a2a2a';
+      cell.style.borderRadius = '8px';
+      cell.style.padding = '8px';
+      const name = document.createElement('p');
+      name.className = 'dialog-text';
+      name.textContent = String(it && it.id || '');
+      const rar = document.createElement('span');
+      rar.className = 'dialog-text';
+      rar.textContent = `稀有度：${String(it && it.rarity || 'N')}`;
+      cell.appendChild(name);
+      cell.appendChild(rar);
+      list.appendChild(cell);
+    });
+  }
+  sortAcquireBtn.addEventListener('click', () => { sortInventoryByAcquire(); renderList(); });
+  sortRarityBtn.addEventListener('click', () => { sortInventoryByRarity(); renderList(); });
+  thSelect.value = getAutoDecomposeThreshold() || '';
+  thSelect.addEventListener('change', () => { setAutoDecomposeThreshold(thSelect.value || ''); });
+  applyBtn.addEventListener('click', () => { applyAutoDecompose(); renderList(); });
+  modal.appendChild(close);
+  modal.appendChild(title);
+  modal.appendChild(list);
+  actions.appendChild(sortAcquireBtn);
+  actions.appendChild(sortRarityBtn);
+  actions.appendChild(thLabel);
+  actions.appendChild(thSelect);
+  actions.appendChild(applyBtn);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  renderList();
+}
