@@ -587,7 +587,7 @@ let isGameOver = false;
 const timerRegistry = { intervals: new Set(), timeouts: new Set() };
 function trackedSetInterval(fn, ms) { const id = setInterval(fn, ms); timerRegistry.intervals.add(id); return id; }
 function trackedSetTimeout(fn, ms) { const id = setTimeout(fn, ms); timerRegistry.timeouts.add(id); return id; }
-function clearAllTimers() { timerRegistry.intervals.forEach((id) => clearInterval(id)); timerRegistry.timeouts.forEach((id) => clearTimeout(id)); timerRegistry.intervals.clear(); timerRegistry.timeouts.clear(); }
+function clearAllTimers() { timerRegistry.intervals.forEach((id) => clearInterval(id)); timerRegistry.timeouts.forEach((id) => clearTimeout(id)); timerRegistry.intervals.clear(); timerRegistry.timeouts.clear(); window.scoreDisplayIntervalId = null; }
 function systemCleanup(lockGame) { clearAllTimers(); if (lockGame === true) isGameOver = true; }
 function bumpScore(amount) {
   matchScore += amount;
@@ -729,6 +729,20 @@ function finalizeGame() {
   }
   saveScore(playerName, matchScore, route);
   finishAndRender();
+}
+
+function consumeCard() {
+  if (selectedCardId === 'card_dream') {
+    try {
+      const raw = localStorage.getItem('hanliu_inventory');
+      let arr = raw ? JSON.parse(raw) : [];
+      const idx = arr.indexOf('card_dream');
+      if (idx >= 0) {
+        arr.splice(idx, 1);
+        localStorage.setItem('hanliu_inventory', JSON.stringify(arr));
+      }
+    } catch {}
+  }
 }
 
 function handleError(levelType) {
@@ -5626,6 +5640,7 @@ document.addEventListener('keydown', (e) => {
       if (dc) dc.style.display = '';
       const da = debugLevelInput ? debugLevelInput.parentElement : null;
       if (da) da.style.display = '';
+      if (autoTestBtn) autoTestBtn.style.display = '';
     });
   }
 });
